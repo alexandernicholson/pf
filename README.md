@@ -11,7 +11,7 @@ Call <PRIVATE_PERSON> at <PRIVATE_PHONE> or <PRIVATE_EMAIL>
 ```
 
 Output is byte-identical to the Python reference (`opf --device cpu`) on every
-input tested — including windowed long inputs — at ~1,500 tok/s warm on an M2
+input tested — including windowed long inputs — at ~1,650 tok/s warm on an M2
 Air (~65× the reference, ~166 GFLOPS sustained).
 
 ## What's inside (pf.c, ~1,300 lines)
@@ -42,7 +42,7 @@ mmap + page pre-touch load unless noted.
 |--------------------------------------------|-----------------|-----------------|--------:|
 | One email (107 tok), end-to-end            | 7.7 s           | 1.0 s           |    ~8×  |
 | One 2,821-token doc, end-to-end            | 80.5 s          | 3.0 s           |   ~27×  |
-| Same doc, inference only                   | ~73 s (39 tok/s)| 1.9 s (1,484 tok/s) | ~38× |
+| Same doc, inference only                   | ~73 s (39 tok/s)| 1.9 s (1,659 tok/s) | ~38× |
 | 144 short docs, one API call each (model preloaded) | 252.7 s (0.6 docs/s) | — | |
 | 156 short docs, `pf --lines` (one packed forward), end-to-end | — | 3.8 s (41 docs/s) | ~70× |
 | Short docs via HTTP server, 32 concurrent clients | n/a (no server) | 55 docs/s | |
@@ -123,6 +123,29 @@ At 32 concurrent single-doc clients this roughly doubles throughput over
 sequential handling (~29 → ~55 docs/s on an M2 Air) with identical outputs;
 solo-request latency pays only the linger. Adding a format = one row in the
 `ADAPTERS` table (route + path patterns).
+
+## Portability
+
+One small kernel interface, three implementations, chosen at compile time:
+
+- **NEON + BFDOT** — Apple Silicon and AWS Graviton 3/4 (`-mcpu=native`)
+- **AVX2 + FMA** — Intel / AMD (`-mavx2 -mfma`), same shift-widen bf16 trick
+- **scalar C** — anything else
+
+All three produce byte-identical output (the AVX2 and scalar builds are
+verified under Rosetta 2). Threading uses libdispatch on macOS and a built-in
+pthread pool elsewhere; no other dependencies. Linux build:
+`cc -O3 -std=c11 -march=native -pthread -o pf pf.c -lm`
+
+## Approximate mode
+
+`--skip-beta B` enables dynamic expert skipping (Lu et al. 2024): expert
+slots whose routing weight is below `B x` the top slot's are dropped and the
+rest renormalized. Measured on this model: it is **not** output-preserving at
+any useful threshold (even B=0.02 flips ~8% of dense-PII docs, mostly span
+boundaries on near-tie tokens; B=0.6 is ~30% faster and flips ~8% of short
+docs). Default off; treat it as an accuracy/speed dial and evaluate on your
+own corpus before enabling.
 
 Categories: `account_number`, `private_address`, `private_date`,
 `private_email`, `private_person`, `private_phone`, `private_url`, `secret`.

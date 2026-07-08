@@ -19,6 +19,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <pthread.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <signal.h>
@@ -69,7 +70,9 @@
 #define RMS_EPS      1e-5f
 #define QK_SCALE     0.35355339059327379f /* 64^-0.25 */
 #define NEG_INF      (-1e9f)
+#define MOE_B  16    /* tokens per expert block */
 
+static float g_skip_beta = 0.0f;   /* --skip-beta: dynamic expert skipping */
 static const char *CAT[NCAT] = {"account_number","private_address","private_date",
     "private_email","private_person","private_phone","private_url","secret"};
 
@@ -159,6 +162,56 @@ static __attribute__((unused)) void axpy8_bf16(const float *a, const bf16 *w, si
         vst1q_f32(y + j + 12, vaddq_f32(y3, z3));
     }
 }
+#elif defined(__AVX2__) && defined(__FMA__)
+#include <immintrin.h>
+static inline __m256 bf8(const bf16 *p) {
+    return _mm256_castsi256_ps(_mm256_slli_epi32(
+        _mm256_cvtepu16_epi32(_mm_loadu_si128((const __m128i *)p)), 16));
+}
+static float dot_bf16(const float *x, const bf16 *w, int n) {
+    __m256 a0 = _mm256_setzero_ps(), a1 = _mm256_setzero_ps();
+    int i = 0;
+    for (; i + 16 <= n; i += 16) {
+        a0 = _mm256_fmadd_ps(_mm256_loadu_ps(x + i), bf8(w + i), a0);
+        a1 = _mm256_fmadd_ps(_mm256_loadu_ps(x + i + 8), bf8(w + i + 8), a1);
+    }
+    a0 = _mm256_add_ps(a0, a1);
+    __m128 lo = _mm_add_ps(_mm256_castps256_ps128(a0), _mm256_extractf128_ps(a0, 1));
+    lo = _mm_hadd_ps(lo, lo); lo = _mm_hadd_ps(lo, lo);
+    float s = _mm_cvtss_f32(lo);
+    for (; i < n; i++) s += x[i] * b2f(w[i]);
+    return s;
+}
+static float dot_f32(const float *x, const float *y, int n) {
+    __m256 a0 = _mm256_setzero_ps();
+    int i = 0;
+    for (; i + 8 <= n; i += 8)
+        a0 = _mm256_fmadd_ps(_mm256_loadu_ps(x + i), _mm256_loadu_ps(y + i), a0);
+    __m128 lo = _mm_add_ps(_mm256_castps256_ps128(a0), _mm256_extractf128_ps(a0, 1));
+    lo = _mm_hadd_ps(lo, lo); lo = _mm_hadd_ps(lo, lo);
+    float s = _mm_cvtss_f32(lo);
+    for (; i < n; i++) s += x[i] * y[i];
+    return s;
+}
+static void axpy8_bf16(const float *a, const bf16 *w, size_t stride, float *y, int n) {
+    for (int j = 0; j < n; j += 16) {
+        __m256 y0 = _mm256_loadu_ps(y + j), y1 = _mm256_loadu_ps(y + j + 8);
+        for (int r = 0; r < 8; r++) {
+            __m256 va = _mm256_set1_ps(a[r]);
+            const bf16 *wr = w + r * stride + j;
+            y0 = _mm256_fmadd_ps(va, bf8(wr), y0);
+            y1 = _mm256_fmadd_ps(va, bf8(wr + 8), y1);
+        }
+        _mm256_storeu_ps(y + j, y0); _mm256_storeu_ps(y + j + 8, y1);
+    }
+}
+static __attribute__((unused)) void axpy_bf16(float a, const bf16 *w, float *y, int n) {
+    int i = 0;
+    __m256 va = _mm256_set1_ps(a);
+    for (; i + 8 <= n; i += 8)
+        _mm256_storeu_ps(y + i, _mm256_fmadd_ps(va, bf8(w + i), _mm256_loadu_ps(y + i)));
+    for (; i < n; i++) y[i] += a * b2f(w[i]);
+}
 #else
 static __attribute__((unused)) float dot_bf16(const float *x, const bf16 *w, int n) {
     float s = 0; for (int i = 0; i < n; i++) s += x[i] * b2f(w[i]); return s;
@@ -202,6 +255,9 @@ static inline float32x4_t exp4(float32x4_t x) {
     int32x4_t e = vshlq_n_s32(vcvtq_s32_f32(n), 23);
     return vreinterpretq_f32_s32(vaddq_s32(vreinterpretq_s32_f32(p), e));
 }
+#elif defined(__AVX2__)
+static void cvt_bf16(const bf16 *w, float *y, int n);   /* defined after kernels */
+#define CVT_BF16_AVX2 1
 #else
 static void cvt_bf16(const bf16 *w, float *y, int n) {
     for (int i = 0; i < n; i++) y[i] = b2f(w[i]);
@@ -246,7 +302,6 @@ static float dot_bfx(const bf16 *x, const bf16 *w, int n) {
  * Per 8-row k-tile the weight rows are pair-interleaved once into an L1-resident
  * buffer, then swept by up to MOE_B tokens (BFDOT lane form), so mmap'd expert
  * weights stream from L2/DRAM once per 16-token block instead of once per token. */
-#define MOE_B 16
 static void moe_gemm(const bf16 *w, const bf16 *const *xs, float *const *ys,
                      int B, int n_in, int n_out) {
     bf16 zbuf[8 * 2 * FF];
@@ -284,13 +339,76 @@ static void moe_gemm(const bf16 *w, const bf16 *const *xs, float *const *ys,
 }
 #endif
 
+#if defined(CVT_BF16_AVX2)
+static void cvt_bf16(const bf16 *w, float *y, int n) {
+    int i = 0;
+    for (; i + 8 <= n; i += 8) _mm256_storeu_ps(y + i, bf8(w + i));
+    for (; i < n; i++) y[i] = b2f(w[i]);
+}
+#endif
+
 /* --------------------------------------------------------------- parallel */
 static int pf_serial = -1;
+
+#if !defined(__APPLE__) || defined(PF_POOL)
+/* portable pthread worker pool (Linux/Graviton; libdispatch is Apple-only) */
+#include <stdatomic.h>
+static struct {
+    pthread_t th[64];
+    pthread_mutex_t mu;
+    pthread_cond_t go, done;
+    void (*fn)(void *, size_t); void *ctx;
+    size_t n; _Atomic size_t next;
+    int epoch, running, nthreads, started;
+} PP = { .mu = PTHREAD_MUTEX_INITIALIZER,
+         .go = PTHREAD_COND_INITIALIZER, .done = PTHREAD_COND_INITIALIZER };
+
+static void *pp_worker(void *arg) {
+    (void)arg;
+    int seen = 0;
+    for (;;) {
+        pthread_mutex_lock(&PP.mu);
+        while (PP.epoch == seen) pthread_cond_wait(&PP.go, &PP.mu);
+        seen = PP.epoch;
+        pthread_mutex_unlock(&PP.mu);
+        for (size_t i; (i = atomic_fetch_add(&PP.next, 1)) < PP.n; )
+            PP.fn(PP.ctx, i);
+        pthread_mutex_lock(&PP.mu);
+        if (--PP.running == 0) pthread_cond_signal(&PP.done);
+        pthread_mutex_unlock(&PP.mu);
+    }
+    return NULL;
+}
+
+static void pool_pfor(size_t n, void (*fn)(void *, size_t), void *ctx) {
+    if (!PP.started) {
+        long nc = sysconf(_SC_NPROCESSORS_ONLN);
+        PP.nthreads = nc < 1 ? 1 : (nc > 64 ? 64 : (int)nc);
+        for (int i = 0; i < PP.nthreads; i++)
+            pthread_create(&PP.th[i], NULL, pp_worker, NULL);
+        PP.started = 1;
+    }
+    pthread_mutex_lock(&PP.mu);
+    PP.fn = fn; PP.ctx = ctx; PP.n = n;
+    atomic_store(&PP.next, 0);
+    PP.running = PP.nthreads;
+    PP.epoch++;
+    pthread_cond_broadcast(&PP.go);
+    while (PP.running) pthread_cond_wait(&PP.done, &PP.mu);
+    pthread_mutex_unlock(&PP.mu);
+}
+#endif
+
 static void pfor(size_t n, void (*fn)(void *, size_t), void *ctx) {
     if (pf_serial < 0) pf_serial = getenv("PF_SERIAL") != NULL;
-#if defined(__APPLE__)
-    if (!pf_serial) { dispatch_apply_f(n, DISPATCH_APPLY_AUTO, ctx, fn); return; }
+    if (!pf_serial) {
+#if defined(__APPLE__) && !defined(PF_POOL)
+        dispatch_apply_f(n, DISPATCH_APPLY_AUTO, ctx, fn);
+#else
+        pool_pfor(n, fn, ctx);
 #endif
+        return;
+    }
     for (size_t i = 0; i < n; i++) fn(ctx, i);
 }
 
@@ -842,17 +960,41 @@ static void ph_b(void *ctx, size_t t) {
             if (s > mx) mx = s;
         }
         float den = expf(sink - mx);
-        for (int j = j0; j <= j1; j++) {
-            sc[j - j0] = expf(sc[j - j0] - mx);
-            den += sc[j - j0];
-        }
+        int W = j1 - j0 + 1;
         float *o = ao + h * HD;
+#if defined(__aarch64__)
+        {   /* vectorized exp over the window, then V-accumulation with the
+             * 64-float output held in 16 NEON registers across the sweep */
+            float32x4_t vden = vdupq_n_f32(0), vmx = vdupq_n_f32(mx);
+            int j = 0;
+            for (; j + 4 <= W; j += 4) {
+                float32x4_t e = exp4(vsubq_f32(vld1q_f32(sc + j), vmx));
+                vst1q_f32(sc + j, e);
+                vden = vaddq_f32(vden, e);
+            }
+            den += vaddvq_f32(vden);
+            for (; j < W; j++) { sc[j] = expf(sc[j] - mx); den += sc[j]; }
+            float32x4_t acc[HD / 4];
+            for (int i = 0; i < HD / 4; i++) acc[i] = vdupq_n_f32(0);
+            const float *vj = R.v + (size_t)j0 * KVD + g * HD;
+            for (j = 0; j < W; j++, vj += KVD) {
+                float32x4_t wv = vdupq_n_f32(sc[j]);
+                for (int i = 0; i < HD / 4; i++)
+                    acc[i] = vfmaq_f32(acc[i], wv, vld1q_f32(vj + 4 * i));
+            }
+            float32x4_t inv = vdupq_n_f32(1.0f / den);
+            for (int i = 0; i < HD / 4; i++)
+                vst1q_f32(o + 4 * i, vmulq_f32(acc[i], inv));
+        }
+#else
+        for (int j = 0; j < W; j++) { sc[j] = expf(sc[j] - mx); den += sc[j]; }
         for (int i = 0; i < HD; i++) o[i] = 0;
-        for (int j = j0; j <= j1; j++) {
-            float w = sc[j - j0] / den;
-            const float *vj = R.v + (size_t)j * KVD + g * HD;
+        for (int j = 0; j < W; j++) {
+            float w = sc[j] / den;
+            const float *vj = R.v + (size_t)(j0 + j) * KVD + g * HD;
             for (int i = 0; i < HD; i++) o[i] += w * vj[i];
         }
+#endif
     }
     float *x = R.x + t * D;
     bf16 aoh[QD];
@@ -878,6 +1020,21 @@ static void ph_b(void *ctx, size_t t) {
     float mx = gw[0], den = 0;
     for (int s = 0; s < TOPK; s++) { gw[s] = expf(gw[s] - mx); den += gw[s]; }
     for (int s = 0; s < TOPK; s++) gw[s] /= den;
+    if (g_skip_beta > 0.0f) {
+        /* dynamic expert skipping (Lu et al. 2024): drop slot s when its
+         * routing weight is far below the top expert's, renormalize the rest */
+        float thr = g_skip_beta * gw[0], kden = 0;
+        int keep = TOPK;
+        for (int s = 0; s < TOPK; s++) {
+            if (s > 0 && gw[s] < thr) { keep = s; break; }
+            kden += gw[s];
+        }
+        for (int s = keep; s < TOPK; s++) {
+            ei[s] = -1;
+            memset(R.moe + ((size_t)t * TOPK + s) * D, 0, D * 4);
+        }
+        for (int s = 0; s < keep; s++) gw[s] /= kden;
+    }
 }
 
 /* swiglu halves -> h (chunked layout, gpt-oss clamps and +1 linear bias) */
@@ -938,7 +1095,6 @@ static void ph_c(void *ctx, size_t c) {
               R.wlist + R.wchunk[c].off, R.wchunk[c].cnt);
 }
 #else
-#define MOE_B 16
 static void ph_c(void *ctx, size_t c) {
     (void)ctx;
     Layer *y = &M.L[R.layer];
@@ -1013,6 +1169,7 @@ static void forward(const int32_t *ids, int T) {
         for (int e = 0; e < NE; e++) R.bucket[e] = -1;
         for (int it = T * TOPK - 1; it >= 0; it--) {
             int e = R.eidx[it];
+            if (e < 0) continue;                 /* skipped by --skip-beta */
             R.chain[it] = R.bucket[e];
             R.bucket[e] = it;
         }
@@ -1698,6 +1855,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[a], "--lines") || !strcmp(argv[a], "-l")) lines = 1;
         else if (!strcmp(argv[a], "--serve") && a + 1 < argc) serve_port = atoi(argv[++a]);
         else if (!strcmp(argv[a], "--linger") && a + 1 < argc) g_linger_us = atoi(argv[++a]) * 1000;
+        else if (!strcmp(argv[a], "--skip-beta") && a + 1 < argc) g_skip_beta = (float)atof(argv[++a]);
         else if (!strcmp(argv[a], "--batch") && a + 1 < argc) batch_tok = atoi(argv[++a]);
         else if (!strcmp(argv[a], "-f") && a + 1 < argc) file = argv[++a];
         else {
