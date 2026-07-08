@@ -30,6 +30,34 @@ Air (~65× the reference, ~166 GFLOPS sustained).
   shipped calibration biases are all zero) → span merge, UTF-8 snap,
   whitespace trim, per-label overlap discard → `<LABEL>` masking.
 
+## Benchmarks vs OpenAI's bundled tool
+
+Same machine (MacBook Air M2, 8 cores, 24GB), same checkpoint, both on CPU,
+**byte-identical outputs**. "Reference" is the `opf` CLI / Python API from
+[openai/privacy-filter](https://github.com/openai/privacy-filter) at default
+settings (PyTorch CPU path, no `torch.compile`); `pf` timings include its
+mmap + page pre-touch load unless noted.
+
+| Workload                                   | reference `opf` | `pf`            | speedup |
+|--------------------------------------------|-----------------|-----------------|--------:|
+| One email (107 tok), end-to-end            | 7.7 s           | 1.0 s           |    ~8×  |
+| One 2,821-token doc, end-to-end            | 80.5 s          | 3.0 s           |   ~27×  |
+| Same doc, inference only                   | ~73 s (39 tok/s)| 1.9 s (1,484 tok/s) | ~38× |
+| 144 short docs, one API call each (model preloaded) | 252.7 s (0.6 docs/s) | — | |
+| 156 short docs, `pf --lines` (one packed forward), end-to-end | — | 3.8 s (41 docs/s) | ~70× |
+| Short docs via HTTP server, 32 concurrent clients | n/a (no server) | 55 docs/s | |
+
+Notes: the reference has no batch or server mode, so the many-docs rows
+compare its natural usage (one call per document, ~1.75 s each of which is
+per-call overhead) against `pf`'s. Load alone: reference ≈ 6.5 s
+(torch import + module build) vs `pf` ≈ 0.25 s warm page cache / ~3 s cold.
+Forward-only throughput on long inputs is ~1,400–1,550 tok/s (~166 GFLOPS
+sustained; the MoE kernel runs at ~86 of a measured ~91 GMAC/s practical
+ceiling). Fanless M2 thermals add ±5% on sustained runs. The precision story:
+`pf` accumulates in fp32 over the same bf16 weights and rounds activations to
+bf16 at matmul inputs exactly where the reference does — Viterbi label
+streams, and therefore outputs, matched the reference on every input tested.
+
 ## Setup
 
 ```sh
