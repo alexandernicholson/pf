@@ -77,7 +77,7 @@ python3 -c "import tiktoken,base64; e=tiktoken.get_encoding('o200k_base'); \
 ./pf -f file               # from file ("-" = stdin), or pipe to stdin
 ./pf -j "text"             # JSON spans (byte offsets)
 ./pf --lines -f file       # batch mode: one document per input line, one output line each
-./pf --batch N             # token budget per packed batch (default 8192, min = ctx)
+./pf --batch N             # token budget per packed batch (default 16384, min = ctx)
 ./pf --argmax              # per-token argmax instead of Viterbi
 ./pf --ctx N               # context window (default 4096, matching reference CPU)
 ./pf --stats               # timing breakdown on stderr
@@ -118,7 +118,7 @@ curl -s localhost:8080/redact/anthropic -d '{
 All text fields in one request are masked in a single packed forward, and
 concurrent requests are **dynamically batched**: connection threads tokenize
 and enqueue, a batcher thread drains the queue after a linger window
-(`--linger MS`, default 3) and runs one forward over everything in flight.
+(`--linger MS`, default 8) and runs one forward over everything in flight.
 At 32 concurrent single-doc clients this roughly doubles throughput over
 sequential handling (~29 → ~55 docs/s on an M2 Air) with identical outputs;
 solo-request latency pays only the linger. Adding a format = one row in the

@@ -70,7 +70,9 @@
 #define RMS_EPS      1e-5f
 #define QK_SCALE     0.35355339059327379f /* 64^-0.25 */
 #define NEG_INF      (-1e9f)
+#ifndef MOE_B
 #define MOE_B  16    /* tokens per expert block */
+#endif
 
 static float g_skip_beta = 0.0f;   /* --skip-beta: dynamic expert skipping */
 static const char *CAT[NCAT] = {"account_number","private_address","private_date",
@@ -1676,7 +1678,7 @@ static pthread_mutex_t bq_mu = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bq_new  = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t  bq_done = PTHREAD_COND_INITIALIZER;
 static Job *bq_head, *bq_tail;
-static int g_nctx_srv, g_argmax_srv, g_linger_us = 3000;
+static int g_nctx_srv, g_argmax_srv, g_linger_us = 8000;
 
 static void *batcher_main(void *arg) {
     (void)arg;
@@ -1841,7 +1843,7 @@ static void http_serve(int port, int n_ctx, int use_argmax) {
 int main(int argc, char **argv) {
     const char *model_dir = getenv("PF_MODEL") ? getenv("PF_MODEL") : "model";
     int n_ctx = 4096, json = 0, use_argmax = 0, stats = 0, dump = 0;
-    int lines = 0, batch_tok = 8192, serve_port = 0;
+    int lines = 0, batch_tok = 16384, serve_port = 0;
     const char *file = NULL;
     char *text = NULL; size_t text_len = 0;
     for (int a = 1; a < argc; a++) {
