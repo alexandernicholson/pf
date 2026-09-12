@@ -104,7 +104,7 @@ def main() -> int:
     p.add_argument("--ldflags", default="-lm -pthread")
     p.add_argument("--reps", type=int, default=5)
     p.add_argument("--target-ms", type=float, default=25)
-    p.add_argument("--profile", choices=["quick", "extended", "diverse"], default="quick")
+    p.add_argument("--profile", choices=["quick", "extended"], default="quick")
     p.add_argument("--parallel", action="store_true")
     p.add_argument("--results", type=Path, default=ROOT / "bench/results")
     p.add_argument("--timeout", type=float, default=180)

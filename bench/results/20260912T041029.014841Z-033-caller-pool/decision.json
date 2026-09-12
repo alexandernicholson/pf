@@ -1,0 +1,5 @@
+{
+  "iteration": 33,
+  "status": "rejected",
+  "reason": "Caller participation did not improve the extended suite; consider separately on new short-input cases."
+}

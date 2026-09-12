@@ -20,7 +20,6 @@ static uint32_t rng_state = 0x51a77e09u;
 static float *initial_x, *proj_x, *proj_out;
 static bf16 *proj_xh;
 static int bench_experts, bench_m, bench_tokens, bench_segment;
-static int bench_items, bench_expert_items[NE], bench_expert_start[NE];
 static int bench_kind;
 enum { BENCH_MOE, BENCH_QKV, BENCH_OUT, BENCH_PHASE_B, BENCH_LAYER };
 
@@ -126,21 +125,14 @@ static void setup_case(int kind, int experts, int m, int tokens, int segment) {
         int n = 0, chunks = 0;
         for (int e = 0; e < experts; e++) {
             int start = n;
-            /* m=0 adds a deterministic uneven occupancy without consuming RNG.
-             * Existing uniform cases retain their original ordering and data. */
-            int count = m ? m : 1 + e % 31;
-            bench_expert_start[e] = start;
-            bench_expert_items[e] = count;
-            if (n + count > tokens) die("expert items exceed benchmark tokens");
-            for (int j = 0; j < count; j++) {
-                R.wlist[n] = n * TOPK; n++;
+            for (int j = 0; j < m; j++) {
+                R.wlist[n++] = (e * m + j) * TOPK;
                 if (n-start == MOE_B) {
                     R.wchunk[chunks++] = (struct WChunk){e, start, MOE_B}; start = n;
                 }
             }
             if (n > start) R.wchunk[chunks++] = (struct WChunk){e, start, n-start};
         }
-        bench_items = n;
         R.nchunk = chunks;
     }
     for (int t = 0; t < tokens; t++) {
@@ -299,8 +291,7 @@ static Error correctness(void) {
          * for streaming cases, all rows and every item within those chunks. */
         for (int e = 0; e < bench_experts; e++)
             if (bench_experts <= 4 || e == 0 || e == bench_experts/2 || e == bench_experts-1)
-                for (int j = 0; j < bench_expert_items[e]; j++)
-                    reference_expert(&err, e, (bench_expert_start[e]+j)*TOPK);
+                for (int j = 0; j < bench_m; j++) reference_expert(&err, e, (e*bench_m+j)*TOPK);
     } else {
         for (int t = 0; t < R.T; t++)
             if (t == 0 || t == R.T/2 || t == R.T-1) reference_attention(&err, t);
@@ -316,7 +307,7 @@ static uint64_t output_hash(void) {
     if (bench_kind == BENCH_QKV || bench_kind == BENCH_OUT)
         return hash_floats(h, proj_out, bench_kind == BENCH_QKV ? QKVD : D);
     if (bench_kind == BENCH_MOE) {
-        for (int i = 0; i < bench_items; i++) h = hash_floats(h, R.moe+(size_t)i*TOPK*D, D);
+        for (int i = 0; i < bench_experts * bench_m; i++) h = hash_floats(h, R.moe+(size_t)i*TOPK*D, D);
         return h;
     }
     h = hash_floats(h, R.ao, (size_t)R.T*QD);
@@ -326,45 +317,6 @@ static uint64_t output_hash(void) {
     h = hash_bytes(h, R.eidx, (size_t)R.T*TOPK*sizeof(int));
     if (bench_kind == BENCH_LAYER) h = hash_floats(h, R.moe, (size_t)R.T*TOPK*D);
     return h;
-}
-/* Read routing after the correctness call, outside every timed interval. These
- * fields retain the distribution behind timings rather than just token count.
- * For phase B, chunks describe the next expert phase; no routing buffers change. */
-static void print_routing_metadata(const char *name) {
-    if (bench_kind != BENCH_MOE && bench_kind != BENCH_PHASE_B && bench_kind != BENCH_LAYER) return;
-    int counts[NE] = {0};
-    if (bench_kind == BENCH_MOE) {
-        for (int e = 0; e < bench_experts; e++) counts[e] = bench_expert_items[e];
-    } else {
-        for (int it = 0; it < R.T * TOPK; it++) {
-            int e = R.eidx[it];
-            if (e >= 0 && e < NE) counts[e]++;
-        }
-    }
-    int active = 0, items = 0, min_items = 0, max_items = 0, singleton_experts = 0;
-    int chunks = 0, min_chunk = 0, max_chunk = 0, singleton_chunks = 0, full_chunks = 0;
-    for (int e = 0; e < NE; e++) {
-        int count = counts[e];
-        if (!count) continue;
-        if (!active || count < min_items) min_items = count;
-        if (count > max_items) max_items = count;
-        active++; items += count; singleton_experts += count == 1;
-        while (count) {
-            int n = count < MOE_B ? count : MOE_B;
-            if (!chunks || n < min_chunk) min_chunk = n;
-            if (n > max_chunk) max_chunk = n;
-            chunks++; singleton_chunks += n == 1; full_chunks += n == MOE_B;
-            count -= n;
-        }
-    }
-    printf("{\"type\":\"routing\",\"case\":\"%s\",\"routing_items\":%d,"
-           "\"occupied_experts\":%d,\"expert_items_min\":%d,\"expert_items_max\":%d,"
-           "\"singleton_experts\":%d,\"chunks\":%d,\"chunk_items_min\":%d,"
-           "\"chunk_items_max\":%d,\"singleton_chunks\":%d,\"full_chunks\":%d,"
-           "\"expert_item_counts\":[", name, items, active, min_items, max_items,
-           singleton_experts, chunks, min_chunk, max_chunk, singleton_chunks, full_chunks);
-    for (int e = 0; e < NE; e++) printf("%s%d", e ? "," : "", counts[e]);
-    printf("]}\n");
 }
 static double timeval_us(struct timeval v) { return (double)v.tv_sec*1e6 + v.tv_usec; }
 static int run_case(const char *name, int kind, int experts, int m, int tokens,
@@ -382,7 +334,6 @@ static int run_case(const char *name, int kind, int experts, int m, int tokens,
            sqrt(error.sum_sq / fmax(error.sum_ref_sq, 1e-30)), expected_hash);
     fflush(stdout);
     if (error.failed) return 1;
-    print_routing_metadata(name);
     uint64_t c0 = ns_clock(CLOCK_MONOTONIC);
     invoke_case(); invoke_case();
     uint64_t elapsed = ns_clock(CLOCK_MONOTONIC) - c0;
@@ -392,7 +343,7 @@ static int run_case(const char *name, int kind, int experts, int m, int tokens,
     size_t weight_bytes = (kind == BENCH_MOE || kind == BENCH_LAYER)
         ? (size_t)(kind == BENCH_MOE ? experts : NE)*(D*2*FF + FF*D)*sizeof(bf16)
         : (kind == BENCH_QKV ? (size_t)QKVD*D*2 : (size_t)D*QD*2 + (kind == BENCH_OUT ? 0 : NE*D*2));
-    double flops = kind == BENCH_MOE ? (double)bench_items*2*(D*2*FF+FF*D)
+    double flops = kind == BENCH_MOE ? (double)experts*m*2*(D*2*FF+FF*D)
         : kind == BENCH_QKV ? (double)QKVD*D*2
         : kind == BENCH_OUT ? (double)D*QD*2 : 0;
     printf("{\"type\":\"workload\",\"case\":\"%s\",\"synthetic_weights\":true,"
@@ -426,18 +377,13 @@ static int run_case(const char *name, int kind, int experts, int m, int tokens,
     return 0;
 }
 int main(int argc, char **argv) {
-    int reps = 5, extended = 0, diverse = 0;
+    int reps = 5, extended = 0;
     double target_ms = 25;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--parallel")) bench_parallel = 1;
         else if (!strcmp(argv[i], "--reps") && i+1 < argc) reps = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--target-ms") && i+1 < argc) target_ms = atof(argv[++i]);
-        else if (!strcmp(argv[i], "--profile") && i+1 < argc) {
-            const char *profile = argv[++i];
-            diverse = !strcmp(profile, "diverse");
-            extended = diverse || !strcmp(profile, "extended");
-            if (!extended && strcmp(profile, "quick")) die("unknown benchmark profile");
-        }
+        else if (!strcmp(argv[i], "--profile") && i+1 < argc) extended = !strcmp(argv[++i], "extended");
         else die("unknown benchmark option");
     }
     if (reps < 1 || reps > 1000 || target_ms <= 0 || target_ms > 10000) die("invalid benchmark settings");
@@ -445,7 +391,7 @@ int main(int argc, char **argv) {
            "\"seed_hex\":\"51a77e09\",\"model_weights\":false,\"D\":%d,\"FF\":%d,\"NE\":%d,\"MOE_B\":%d,"
            "\"reference\":\"independent_double\",\"clock\":\"CLOCK_MONOTONIC\",\"reps\":%d,"
            "\"target_ms\":%.3f,\"profile\":\"%s\"}\n", D, FF, NE, MOE_B, reps, target_ms,
-           diverse ? "diverse" : extended ? "extended" : "quick");
+           extended ? "extended" : "quick");
     setup_model();
     int failures = 0;
 #define RUN(n,k,e,m,t,s) do { failures += run_case(n,k,e,m,t,s,reps,target_ms); } while (0)
@@ -463,19 +409,6 @@ int main(int argc, char **argv) {
     if (extended) {
         RUN("layer_t32", BENCH_LAYER, NE, 0, 32, 32);
         RUN("layer_packed_t256_s32", BENCH_LAYER, NE, 0, 256, 32);
-    }
-    if (diverse) {
-        /* Append only: the extended profile's RNG state and case order stay
-         * unchanged, so its existing output hashes remain directly comparable. */
-        RUN("moe_e1_m3", BENCH_MOE, 1, 3, 3, 3);
-        RUN("moe_e1_m7", BENCH_MOE, 1, 7, 7, 7);
-        RUN("moe_e1_m15", BENCH_MOE, 1, 15, 15, 15);
-        RUN("moe_e32_uneven_m1_31", BENCH_MOE, 32, 0, 497, 497);
-        RUN("layer_t1", BENCH_LAYER, NE, 0, 1, 1);
-        RUN("layer_t8", BENCH_LAYER, NE, 0, 8, 8);
-        RUN("layer_packed_t512_s64", BENCH_LAYER, NE, 0, 512, 64);
-        RUN("phase_b_t512", BENCH_PHASE_B, 0, 0, 512, 512);
-        RUN("layer_t512", BENCH_LAYER, NE, 0, 512, 512);
     }
 #undef RUN
     printf("{\"type\":\"completion\",\"correctness_failures\":%d}\n", failures);
