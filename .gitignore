@@ -4,3 +4,6 @@ pf
 pf_fp32
 *.o
 .DS_Store
+__pycache__/
+bench/results/**/kernel_bench
+bench/.bench.lock

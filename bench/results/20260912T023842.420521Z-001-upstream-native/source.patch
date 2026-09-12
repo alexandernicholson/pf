@@ -1,0 +1,21 @@
+diff --git a/pf.c b/pf.c
+index 3969e48..d7b5963 100644
+--- a/pf.c
++++ b/pf.c
+@@ -266,7 +266,7 @@ static inline float32x4_t exp4(float32x4_t x) {
+     int32x4_t e = vshlq_n_s32(vcvtq_s32_f32(n), 23);
+     return vreinterpretq_f32_s32(vaddq_s32(vreinterpretq_s32_f32(p), e));
+ }
+-#elif defined(__AVX2__)
++#elif defined(__AVX2__) && defined(__FMA__)
+ static void cvt_bf16(const bf16 *w, float *y, int n);   /* defined after kernels */
+ #define CVT_BF16_AVX2 1
+ #else
+@@ -1780,6 +1780,7 @@ static void http_send(int fd, const char *status, const char *body, size_t blen)
+ }
+ 
+ static void http_handle(int fd, int n_ctx, int use_argmax) {
++    (void)n_ctx;
+     SB req = {0};
+     size_t hdr_end = 0, body_len = 0;
+     for (;;) {

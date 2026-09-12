@@ -1,0 +1,3 @@
+results/**/kernel_bench
+__pycache__/
+*.pyc
