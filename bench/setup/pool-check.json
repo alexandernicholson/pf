@@ -1,0 +1,74 @@
+[
+  {
+    "PF_THREADS": null,
+    "returncode": 0,
+    "stdout": "{\"pool_epochs\":128,\"exactly_once\":true,\"publication\":true}\n",
+    "stderr": ""
+  },
+  {
+    "PF_THREADS": "1",
+    "returncode": 0,
+    "stdout": "{\"pool_epochs\":128,\"exactly_once\":true,\"publication\":true}\n",
+    "stderr": ""
+  },
+  {
+    "PF_THREADS": "2",
+    "returncode": 0,
+    "stdout": "{\"pool_epochs\":128,\"exactly_once\":true,\"publication\":true}\n",
+    "stderr": ""
+  },
+  {
+    "PF_THREADS": "4",
+    "returncode": 0,
+    "stdout": "{\"pool_epochs\":128,\"exactly_once\":true,\"publication\":true}\n",
+    "stderr": ""
+  },
+  {
+    "PF_THREADS": "8",
+    "returncode": 0,
+    "stdout": "{\"pool_epochs\":128,\"exactly_once\":true,\"publication\":true}\n",
+    "stderr": ""
+  },
+  {
+    "PF_THREADS": "9",
+    "returncode": 0,
+    "stdout": "{\"pool_epochs\":128,\"exactly_once\":true,\"publication\":true}\n",
+    "stderr": ""
+  },
+  {
+    "PF_THREADS": "64",
+    "returncode": 0,
+    "stdout": "{\"pool_epochs\":128,\"exactly_once\":true,\"publication\":true}\n",
+    "stderr": ""
+  },
+  {
+    "PF_THREADS": "0",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "pf: PF_THREADS must be an integer from 1 to 64\n"
+  },
+  {
+    "PF_THREADS": "-1",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "pf: PF_THREADS must be an integer from 1 to 64\n"
+  },
+  {
+    "PF_THREADS": "65",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "pf: PF_THREADS must be an integer from 1 to 64\n"
+  },
+  {
+    "PF_THREADS": "no",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "pf: PF_THREADS must be an integer from 1 to 64\n"
+  },
+  {
+    "PF_THREADS": "",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "pf: PF_THREADS must be an integer from 1 to 64\n"
+  }
+]
