@@ -1,0 +1,5 @@
+{
+  "iteration": 25,
+  "status": "rejected",
+  "reason": "Combined candidate included paired remainder; simpler version selected after comparison."
+}

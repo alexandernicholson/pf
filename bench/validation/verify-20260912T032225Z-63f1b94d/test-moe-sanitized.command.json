@@ -1,0 +1,31 @@
+{
+  "name": "test-moe-sanitized",
+  "argv": [
+    "/tmp/pf-verify-wyj58ma4/moe-sanitized"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {
+    "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+    "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+  },
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T03:22:49Z",
+  "exit_code": 0,
+  "stdout": {
+    "file": "test-moe-sanitized.stdout",
+    "bytes": 6242,
+    "sha256": "a4bded8c487154c19c9a7c3db39e108771f9fbe229502da4f1abf21a0b0c724c"
+  },
+  "stderr": {
+    "file": "test-moe-sanitized.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "passed": true
+}

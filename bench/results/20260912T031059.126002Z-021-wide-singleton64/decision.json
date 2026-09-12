@@ -1,0 +1,5 @@
+{
+  "iteration": 21,
+  "status": "accepted",
+  "reason": "64-lane singleton candidate reduced cached singleton time; retained in final combined source."
+}

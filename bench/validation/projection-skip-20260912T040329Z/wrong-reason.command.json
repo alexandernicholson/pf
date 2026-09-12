@@ -1,0 +1,34 @@
+{
+  "name": "wrong-reason",
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-c",
+    "import sys; print(sys.argv[1]); sys.exit(int(sys.argv[2]))",
+    "{\"status\": \"skip\", \"reason\": \"unexpected\"}",
+    "77"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 30,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T04:03:42Z",
+  "allowed_skip_reason": "projection kernel unavailable",
+  "exit_code": 77,
+  "stdout": {
+    "file": "wrong-reason.stdout",
+    "bytes": 43,
+    "sha256": "41e2b17d7db1667778dcf21acab963515c5ad56529c97e4c0baa362f5a417d1f"
+  },
+  "stderr": {
+    "file": "wrong-reason.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "skipped": false,
+  "passed": false
+}

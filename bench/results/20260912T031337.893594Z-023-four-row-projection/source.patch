@@ -1,0 +1,186 @@
+diff --git a/bench/kernel_bench.c b/bench/kernel_bench.c
+index aa7002f..f2f9e82 100644
+--- a/bench/kernel_bench.c
++++ b/bench/kernel_bench.c
+@@ -169,11 +169,19 @@ static __attribute__((noinline)) void invoke_case(void) {
+     Layer *l = &M.L[0];
+     if (bench_kind == BENCH_MOE) run_phase(R.nchunk, ph_c);
+     else if (bench_kind == BENCH_QKV) {
++#if defined(HAVE_PROJ4)
++        project_x86(proj_x, l->qkv_w, NULL, proj_out, QKVD, D, 0);
++#else
+         for (int i = 0; i < QKVD; i++)
+             proj_out[i] = DOT_X(proj_x, proj_xh, l->qkv_w + (size_t)i * D, D);
++#endif
+     } else if (bench_kind == BENCH_OUT) {
++#if defined(HAVE_PROJ4)
++        project_x86(proj_x, l->attn_out_w, NULL, proj_out, D, QD, 0);
++#else
+         for (int i = 0; i < D; i++)
+             proj_out[i] = DOT_X(proj_x, proj_xh, l->attn_out_w + (size_t)i * QD, QD);
++#endif
+     } else {
+         memcpy(R.x, initial_x, (size_t)R.T * D * sizeof(float));
+         if (bench_kind == BENCH_LAYER) run_phase(R.T, ph_a);
+diff --git a/pf.c b/pf.c
+index 2542300..88cad35 100644
+--- a/pf.c
++++ b/pf.c
+@@ -205,6 +205,28 @@ static float dot_f32(const float *x, const float *y, int n) {
+     return s;
+ }
+ static void axpy8_bf16(const float *a, const bf16 *w, size_t stride, float *y, int n) {
++#if defined(PF_WIDE_AXPY) && defined(__AVX512F__) && defined(__AVX512BW__)
++#ifndef PF_AXPY_NV
++#define PF_AXPY_NV 2
++#endif
++    int j = 0;
++    for (; j + 16 * PF_AXPY_NV <= n; j += 16 * PF_AXPY_NV) {
++        __m512 acc[PF_AXPY_NV];
++        for (int v = 0; v < PF_AXPY_NV; v++) acc[v] = _mm512_loadu_ps(y + j + 16*v);
++        for (int r = 0; r < 8; r++) {
++            __m512 va = _mm512_set1_ps(a[r]);
++            for (int v = 0; v < PF_AXPY_NV; v++) {
++                const bf16 *wr = w + r * stride + j + 16*v;
++                __m512 weight = _mm512_castsi512_ps(_mm512_slli_epi32(
++                    _mm512_cvtepu16_epi32(_mm256_loadu_si256((const __m256i *)wr)), 16));
++                acc[v] = _mm512_fmadd_ps(va, weight, acc[v]);
++            }
++        }
++        for (int v = 0; v < PF_AXPY_NV; v++) _mm512_storeu_ps(y + j + 16*v, acc[v]);
++    }
++    for (; j < n; j++)
++        for (int r = 0; r < 8; r++) y[j] = fmaf(a[r], b2f(w[r * stride + j]), y[j]);
++#else
+     for (int j = 0; j < n; j += 16) {
+         __m256 y0 = _mm256_loadu_ps(y + j), y1 = _mm256_loadu_ps(y + j + 8);
+         for (int r = 0; r < 8; r++) {
+@@ -215,6 +237,7 @@ static void axpy8_bf16(const float *a, const bf16 *w, size_t stride, float *y, i
+         }
+         _mm256_storeu_ps(y + j, y0); _mm256_storeu_ps(y + j + 8, y1);
+     }
++#endif
+ }
+ static __attribute__((unused)) void axpy_bf16(float a, const bf16 *w, float *y, int n) {
+     int i = 0;
+@@ -430,6 +453,29 @@ static void moe_gemm_x86(const bf16 *w, const float *const *xs, float *const *ys
+                     moe_store(ys[i+3] + j + v * MOE_V, a3[v]);
+                 }
+             }
++#if defined(PF_MOE_PAIR)
++            for (; i + 2 <= B; i += 2) {
++                moe_vec a0[MOE_NV], a1[MOE_NV];
++                for (int v = 0; v < MOE_NV; v++) {
++                    a0[v] = moe_load(ys[i] + j + v * MOE_V);
++                    a1[v] = moe_load(ys[i+1] + j + v * MOE_V);
++                }
++                for (int k = kt; k < kend; k++) {
++                    moe_vec x0 = moe_bcast(xs[i][k]);
++                    moe_vec x1 = moe_bcast(xs[i+1][k]);
++                    const bf16 *wk = w + (size_t)k * n_out + j;
++                    for (int v = 0; v < MOE_NV; v++) {
++                        moe_vec wv = moe_weight(wk + v * MOE_V);
++                        a0[v] = moe_fma(x0, wv, a0[v]);
++                        a1[v] = moe_fma(x1, wv, a1[v]);
++                    }
++                }
++                for (int v = 0; v < MOE_NV; v++) {
++                    moe_store(ys[i] + j + v * MOE_V, a0[v]);
++                    moe_store(ys[i+1] + j + v * MOE_V, a1[v]);
++                }
++            }
++#endif
+             for (; i < B; i++) {
+                 moe_vec a[MOE_NV];
+                 for (int v = 0; v < MOE_NV; v++)
+@@ -453,6 +499,45 @@ static void moe_gemm_x86(const bf16 *w, const float *const *xs, float *const *ys
+ #undef moe_weight
+ #endif
+ 
++#if defined(PF_PROJ4) && defined(__AVX512F__) && defined(__AVX512BW__) && defined(__AVX2__) && defined(__FMA__)
++#define HAVE_PROJ4 1
++/* Four independent output rows share each input load. A 16-lane accumulator
++ * holds the original two 8-lane chains; the reduction order is unchanged. */
++static void project_x86(const float *x, const bf16 *w, const bf16 *bias,
++                        float *y, int rows, int cols, int add) {
++    int o = 0;
++    for (; o + 4 <= rows; o += 4) {
++        __m512 acc[4];
++        for (int r = 0; r < 4; r++) acc[r] = _mm512_setzero_ps();
++        int k = 0;
++        for (; k + 16 <= cols; k += 16) {
++            __m512 xv = _mm512_loadu_ps(x + k);
++            for (int r = 0; r < 4; r++) {
++                const bf16 *wr = w + (size_t)(o+r)*cols + k;
++                __m512 wv = _mm512_castsi512_ps(_mm512_slli_epi32(
++                    _mm512_cvtepu16_epi32(_mm256_loadu_si256((const __m256i *)wr)), 16));
++                acc[r] = _mm512_fmadd_ps(xv, wv, acc[r]);
++            }
++        }
++        for (int r = 0; r < 4; r++) {
++            __m256 a = _mm256_add_ps(_mm512_castps512_ps256(acc[r]),
++                _mm256_castpd_ps(_mm512_extractf64x4_pd(_mm512_castps_pd(acc[r]), 1)));
++            __m128 lo = _mm_add_ps(_mm256_castps256_ps128(a), _mm256_extractf128_ps(a, 1));
++            lo = _mm_hadd_ps(lo, lo); lo = _mm_hadd_ps(lo, lo);
++            float sum = _mm_cvtss_f32(lo);
++            for (int i = k; i < cols; i++) sum += x[i] * b2f(w[(size_t)(o+r)*cols+i]);
++            if (bias) sum += b2f(bias[o+r]);
++            if (add) y[o+r] += sum; else y[o+r] = sum;
++        }
++    }
++    for (; o < rows; o++) {
++        float sum = dot_bf16(x, w + (size_t)o * cols, cols);
++        if (bias) sum += b2f(bias[o]);
++        if (add) y[o] += sum; else y[o] = sum;
++    }
++}
++#endif
++
+ /* --------------------------------------------------------------- parallel */
+ static int pf_serial = -1;
+ 
+@@ -1071,6 +1156,11 @@ static void ph_a(void *ctx, size_t t) {
+     rms_norm(x, y->attn_norm, tb);
+     CVT_H(tb, th, D);
+     float *q = R.q + t * QD, *k = R.k + t * KVD, *v = R.v + t * KVD;
++#if defined(HAVE_PROJ4)
++    project_x86(tb, y->qkv_w, y->qkv_b, q, QD, D, 0);
++    project_x86(tb, y->qkv_w + (size_t)QD*D, y->qkv_b + QD, k, KVD, D, 0);
++    project_x86(tb, y->qkv_w + (size_t)(QD+KVD)*D, y->qkv_b + QD+KVD, v, KVD, D, 0);
++#else
+     for (int o = 0; o < QD; o++)
+         q[o] = DOT_X(tb, th, y->qkv_w + (size_t)o * D, D) + b2f(y->qkv_b[o]);
+     for (int o = 0; o < KVD; o++)
+@@ -1078,6 +1168,7 @@ static void ph_a(void *ctx, size_t t) {
+     for (int o = 0; o < KVD; o++)
+         v[o] = DOT_X(tb, th, y->qkv_w + (size_t)(QD + KVD + o) * D, D)
+                + b2f(y->qkv_b[QD + KVD + o]);
++#endif
+     const float *rc = R.rc + (size_t)R.pos[t] * (HD / 2);
+     const float *rs = R.rs + (size_t)R.pos[t] * (HD / 2);
+     rope_apply(q, NH, rc, rs);
+@@ -1144,16 +1235,24 @@ static void ph_b(void *ctx, size_t t) {
+     float *x = R.x + t * D;
+     bf16 aoh[QD];
+     CVT_H(ao, aoh, QD);
++#if defined(HAVE_PROJ4)
++    project_x86(ao, y->attn_out_w, y->attn_out_b, x, D, QD, 1);
++#else
+     for (int o = 0; o < D; o++)
+         x[o] += DOT_X(ao, aoh, y->attn_out_w + (size_t)o * QD, QD) + b2f(y->attn_out_b[o]);
++#endif
+     /* mlp norm + router */
+     float *tb = R.tb + t * D;
+     bf16 *th = R.tbh + t * D;
+     rms_norm(x, y->mlp_norm, tb);
+     CVT_H(tb, th, D);
+     float g[NE];
++#if defined(HAVE_PROJ4)
++    project_x86(tb, y->gate_w, y->gate_b, g, NE, D, 0);
++#else
+     for (int e = 0; e < NE; e++)
+         g[e] = DOT_X(tb, th, y->gate_w + (size_t)e * D, D) + b2f(y->gate_b[e]);
++#endif
+     int   *ei = R.eidx + t * TOPK;
+     float *gw = R.gates + t * TOPK;
+     for (int s = 0; s < TOPK; s++) {

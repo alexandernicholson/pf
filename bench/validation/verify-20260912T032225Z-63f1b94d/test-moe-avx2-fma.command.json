@@ -1,0 +1,28 @@
+{
+  "name": "test-moe-avx2-fma",
+  "argv": [
+    "/tmp/pf-verify-wyj58ma4/moe-avx2-fma"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T03:22:43Z",
+  "exit_code": 0,
+  "stdout": {
+    "file": "test-moe-avx2-fma.stdout",
+    "bytes": 6241,
+    "sha256": "cb4538cbfdc08c25413814c438460122bbd6ff33b84a95410429882fd5cbc9a9"
+  },
+  "stderr": {
+    "file": "test-moe-avx2-fma.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "passed": true
+}

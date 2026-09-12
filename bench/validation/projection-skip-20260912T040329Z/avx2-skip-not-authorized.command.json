@@ -1,0 +1,30 @@
+{
+  "name": "avx2-skip-not-authorized",
+  "argv": [
+    "/tmp/pf-projection-skip-x9jy7ula/avx2"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 30,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T04:03:38Z",
+  "allowed_skip_reason": null,
+  "exit_code": 77,
+  "stdout": {
+    "file": "avx2-skip-not-authorized.stdout",
+    "bytes": 59,
+    "sha256": "63da455574dc1c92c9d45f38b4188e3a65d0c9b6ed7b165950fac141f151b780"
+  },
+  "stderr": {
+    "file": "avx2-skip-not-authorized.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "skipped": false,
+  "passed": false
+}

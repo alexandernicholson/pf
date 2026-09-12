@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "label": "023-four-row-projection",
+  "note": "Four-row AVX512 projections preserve original two-chain reduction; singleton and pair changes disabled.",
+  "started_utc": "2026-09-12T03:13:37.924433+00:00",
+  "status": "passed",
+  "synthetic_weights": true,
+  "arguments": {
+    "label": "023-four-row-projection",
+    "source": "/workspace/scratch/bd054ed0e458/pf-cloud/pf.c",
+    "cc": "cc",
+    "cflags": "-D_GNU_SOURCE -O3 -std=c11 -march=native -DPF_PROJ4",
+    "ldflags": "-lm -pthread",
+    "reps": 9,
+    "target_ms": 60.0,
+    "profile": "extended",
+    "parallel": true,
+    "results": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results",
+    "timeout": 180,
+    "note": "Four-row AVX512 projections preserve original two-chain reduction; singleton and pair changes disabled."
+  },
+  "git_head": {
+    "argv": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "returncode": 0,
+    "stdout": "a8476c8cebd0bb8c2b51ac2e4ce4289979d1ad04\n",
+    "stderr": "",
+    "wall_ns": 12818486
+  },
+  "git_status": {
+    "argv": [
+      "git",
+      "status",
+      "--porcelain=v1"
+    ],
+    "returncode": 0,
+    "stdout": " M bench/kernel_bench.c\n M pf.c\n?? bench/results/20260912T031003.208609Z-019-session2-baseline/\n?? bench/results/20260912T031031.542015Z-020-wide-singleton32/\n?? bench/results/20260912T031059.126002Z-021-wide-singleton64/\n?? bench/results/20260912T031131.159682Z-022-pair-remainder/\n?? bench/results/20260912T031337.893594Z-023-four-row-projection/\n",
+    "stderr": "",
+    "wall_ns": 18444158
+  },
+  "sources": {
+    "pf.c": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/pf.c",
+      "sha256": "b01bf6894acd38272f227a10a3d8d756dacee11ea752077d596e3a698c81a5ad"
+    },
+    "unicode_tables.h": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/unicode_tables.h",
+      "sha256": "826b26d6af67789dea9100f88c8391ea61fffc19593a65b93789b3950f59b870"
+    },
+    "kernel_bench.c": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/kernel_bench.c",
+      "sha256": "cd2ece0eb2899b70128babdbcdb495bd0ec79c8bc9d9f36df1c7696887b5c1ff"
+    },
+    "run.py": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/run.py",
+      "sha256": "c3b56638e47e8f0860fed369c9852497a7af4d0edc741d3505f284c33d49c554"
+    },
+    "Makefile": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/Makefile",
+      "sha256": "5e07f29115126f03932b54f6e3e79bf3c05dccd8bbd9d78bc3d4fae83bce6164"
+    }
+  },
+  "compiler_version": {
+    "argv": [
+      "cc",
+      "--version"
+    ],
+    "returncode": 0,
+    "stdout": "cc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+    "stderr": "",
+    "wall_ns": 9291649
+  },
+  "build": {
+    "argv": [
+      "cc",
+      "-D_GNU_SOURCE",
+      "-O3",
+      "-std=c11",
+      "-march=native",
+      "-DPF_PROJ4",
+      "-DPF_BENCH_SOURCE=\"/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031337.893594Z-023-four-row-projection/source/pf.c\"",
+      "-I",
+      "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031337.893594Z-023-four-row-projection/source",
+      "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031337.893594Z-023-four-row-projection/source/kernel_bench.c",
+      "-o",
+      "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031337.893594Z-023-four-row-projection/kernel_bench",
+      "-lm",
+      "-pthread"
+    ],
+    "returncode": 0,
+    "wall_ns": 3776908027
+  },
+  "binary_sha256": "98994cac54f397abfca7df1a557271531e4d59b92838f40cbd71bffcd30015e1",
+  "run_argv": [
+    "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031337.893594Z-023-four-row-projection/kernel_bench",
+    "--reps",
+    "9",
+    "--target-ms",
+    "60.0",
+    "--profile",
+    "extended",
+    "--parallel"
+  ],
+  "process_wall_ns": 8879113559,
+  "process_rusage": {
+    "ru_utime": 32.938116,
+    "ru_stime": 0.9735459999999999,
+    "ru_minflt": 80662,
+    "ru_majflt": 0,
+    "ru_nvcsw": 25338,
+    "ru_nivcsw": 935
+  },
+  "cumulative_children_maxrss_kib": 321920,
+  "returncode": 0,
+  "parse_errors": [],
+  "completed_utc": "2026-09-12T03:13:50.674144+00:00",
+  "summary": {
+    "moe_e1_m1": {
+      "n": 9,
+      "median_ns": 126031.172867,
+      "min_ns": 118437.838074,
+      "max_ns": 157751.31291,
+      "mean_ns": 129035.16897633334,
+      "p10_ns": 118819.67965,
+      "p90_ns": 144629.418818,
+      "stdev_ns": 13080.4127728465,
+      "hashes_stable": true
+    },
+    "moe_e1_m4": {
+      "n": 9,
+      "median_ns": 244284.326923,
+      "min_ns": 218114.538462,
+      "max_ns": 301780.95,
+      "mean_ns": 254273.68931633333,
+      "p10_ns": 227538.5815388,
+      "p90_ns": 292494.6761536,
+      "stdev_ns": 29530.997794915304,
+      "hashes_stable": true
+    },
+    "moe_e1_m16": {
+      "n": 9,
+      "median_ns": 656824.870588,
+      "min_ns": 620419.364706,
+      "max_ns": 682846.058824,
+      "mean_ns": 654841.2169934445,
+      "p10_ns": 633648.6070588001,
+      "p90_ns": 678310.9247056,
+      "stdev_ns": 19583.26322968515,
+      "hashes_stable": true
+    },
+    "moe_e32_m1": {
+      "n": 9,
+      "median_ns": 2026661.3125,
+      "min_ns": 1718125.09375,
+      "max_ns": 3348001.4375,
+      "mean_ns": 2194426.46875,
+      "p10_ns": 1845267.56875,
+      "p90_ns": 2616035.0375,
+      "stdev_ns": 488964.2227324614,
+      "hashes_stable": true
+    },
+    "moe_e128_m1": {
+      "n": 9,
+      "median_ns": 7606181.777778,
+      "min_ns": 7045115.222222,
+      "max_ns": 9596665.444444,
+      "mean_ns": 7862653.802469,
+      "p10_ns": 7130794.422222001,
+      "p90_ns": 8782139.4888888,
+      "stdev_ns": 813903.4816229912,
+      "hashes_stable": true
+    },
+    "moe_e32_m4": {
+      "n": 9,
+      "median_ns": 3402748.111111,
+      "min_ns": 2430534.555556,
+      "max_ns": 5263020.888889,
+      "mean_ns": 3652833.7654322223,
+      "p10_ns": 2621568.5111112,
+      "p90_ns": 5056619.2000001995,
+      "stdev_ns": 985688.4503507133,
+      "hashes_stable": true
+    },
+    "projection_qkv": {
+      "n": 9,
+      "median_ns": 63546.970803,
+      "min_ns": 61407.115328,
+      "max_ns": 64549.129927,
+      "mean_ns": 63163.81265211111,
+      "p10_ns": 61630.520875999995,
+      "p90_ns": 64509.3413142,
+      "stdev_ns": 1135.5499829482255,
+      "hashes_stable": true
+    },
+    "projection_out": {
+      "n": 9,
+      "median_ns": 39559.648678,
+      "min_ns": 36996.226872,
+      "max_ns": 45031.215859,
+      "mean_ns": 40136.548580333336,
+      "p10_ns": 38239.690308000005,
+      "p90_ns": 43324.9497798,
+      "stdev_ns": 2389.9474665005273,
+      "hashes_stable": true
+    },
+    "phase_b_t32": {
+      "n": 9,
+      "median_ns": 487797.902913,
+      "min_ns": 417976.495146,
+      "max_ns": 708233.980583,
+      "mean_ns": 530939.2815535555,
+      "p10_ns": 421794.6854372,
+      "p90_ns": 705115.363107,
+      "stdev_ns": 121533.41286663698,
+      "hashes_stable": true
+    },
+    "phase_b_t256": {
+      "n": 9,
+      "median_ns": 5045402.769231,
+      "min_ns": 4860928.153846,
+      "max_ns": 6530114.230769,
+      "mean_ns": 5277228.230769223,
+      "p10_ns": 4860986.9230772,
+      "p90_ns": 5822946.3538458,
+      "stdev_ns": 543087.1896458402,
+      "hashes_stable": true
+    },
+    "phase_b_packed_t256_s32": {
+      "n": 9,
+      "median_ns": 3157826.615385,
+      "min_ns": 2740963.923077,
+      "max_ns": 3927322.153846,
+      "mean_ns": 3247329.5213675555,
+      "p10_ns": 2801801.3384618,
+      "p90_ns": 3924052.7384611997,
+      "stdev_ns": 452828.36200841126,
+      "hashes_stable": true
+    },
+    "layer_t32": {
+      "n": 9,
+      "median_ns": 8216075.777778,
+      "min_ns": 7590730.888889,
+      "max_ns": 14986438.222222,
+      "mean_ns": 9271609.148148222,
+      "p10_ns": 7599474.3555554,
+      "p90_ns": 11779496.2666668,
+      "stdev_ns": 2457357.4840221116,
+      "hashes_stable": true
+    },
+    "layer_packed_t256_s32": {
+      "n": 9,
+      "median_ns": 24651637.5,
+      "min_ns": 20103174.5,
+      "max_ns": 29404010.0,
+      "mean_ns": 25296248.333333332,
+      "p10_ns": 22123241.3,
+      "p90_ns": 28796288.8,
+      "stdev_ns": 3036561.0411298648,
+      "hashes_stable": true
+    }
+  }
+}

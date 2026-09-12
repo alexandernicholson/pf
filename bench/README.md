@@ -9,7 +9,10 @@ throughput measurements**.
 compiler output and test output under `bench/validation/`. The final cloud
 validation passed native, AVX2/FMA, generic scalar and AVX2-without-FMA production
 builds with `-Werror`. Native, AVX2 and AddressSanitizer/UndefinedBehaviorSanitizer
-expert tests each passed 25 cases with zero bitwise mismatches. Pool checks cover
+expert tests each passed 25 cases with zero bitwise mismatches. Native and sanitized projection checks cover row/input tails, bias, residual
+addition and output guards with bitwise scalar-reference comparisons. On x86
+hosts without AVX-512, these checks record an explicit unavailable-kernel skip;
+other errors still fail validation. Pool checks cover
 repeated dispatch and invalid settings. LeakSanitizer scanning is unsupported
 in this container; address/UB instrumentation remains enabled. The earlier
 test-only warning and leak-scanner failures are retained in their original logs.
@@ -35,7 +38,7 @@ The default profile contains:
 | --- | --- |
 | `moe_e1_m1`, `moe_e1_m4`, `moe_e1_m16` | Actual `ph_c`, one expert receiving 1, 4 or 16 assignments |
 | `moe_e32_m1`, `moe_e128_m1`, `moe_e32_m4` | Actual `ph_c`, streaming 32 or 128 distinct experts |
-| `projection_qkv`, `projection_out` | Production dot kernel over full 640→1152 and 896→640 projections |
+| `projection_qkv`, `projection_out` | Production projection kernel over full 640→1152 and 896→640 projections |
 | `phase_b_t32`, `phase_b_t256` | Actual attention, output projection, residual, RMS norm and router |
 | `phase_b_packed_t256_s32` | The same phase, 256 tokens split into eight independent 32-token documents |
 

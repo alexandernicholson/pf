@@ -1,0 +1,323 @@
+{
+  "status": "passed",
+  "scope": "Projection verification skip-handling regression; deliberately rejected commands are retained",
+  "commands": [
+    {
+      "name": "build-avx2",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-pthread",
+        "-march=x86-64",
+        "-mavx2",
+        "-mfma",
+        "bench/test_projection.c",
+        "-lm",
+        "-o",
+        "/tmp/pf-projection-skip-x9jy7ula/avx2"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 30,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T04:03:35Z",
+      "allowed_skip_reason": null,
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-avx2.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-avx2.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "skipped": false,
+      "passed": true
+    },
+    {
+      "name": "avx2-allowed-skip",
+      "argv": [
+        "/tmp/pf-projection-skip-x9jy7ula/avx2"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 30,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T04:03:38Z",
+      "allowed_skip_reason": "projection kernel unavailable",
+      "exit_code": 77,
+      "stdout": {
+        "file": "avx2-allowed-skip.stdout",
+        "bytes": 59,
+        "sha256": "63da455574dc1c92c9d45f38b4188e3a65d0c9b6ed7b165950fac141f151b780"
+      },
+      "stderr": {
+        "file": "avx2-allowed-skip.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "skipped": true,
+      "passed": true
+    },
+    {
+      "name": "avx2-skip-not-authorized",
+      "argv": [
+        "/tmp/pf-projection-skip-x9jy7ula/avx2"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 30,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T04:03:38Z",
+      "allowed_skip_reason": null,
+      "exit_code": 77,
+      "stdout": {
+        "file": "avx2-skip-not-authorized.stdout",
+        "bytes": 59,
+        "sha256": "63da455574dc1c92c9d45f38b4188e3a65d0c9b6ed7b165950fac141f151b780"
+      },
+      "stderr": {
+        "file": "avx2-skip-not-authorized.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "skipped": false,
+      "passed": false
+    },
+    {
+      "name": "build-native",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-pthread",
+        "-march=native",
+        "bench/test_projection.c",
+        "-lm",
+        "-o",
+        "/tmp/pf-projection-skip-x9jy7ula/native"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 30,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T04:03:38Z",
+      "allowed_skip_reason": null,
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-native.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-native.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "skipped": false,
+      "passed": true
+    },
+    {
+      "name": "native-real-pass",
+      "argv": [
+        "/tmp/pf-projection-skip-x9jy7ula/native"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 30,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T04:03:42Z",
+      "allowed_skip_reason": "projection kernel unavailable",
+      "exit_code": 0,
+      "stdout": {
+        "file": "native-real-pass.stdout",
+        "bytes": 68,
+        "sha256": "b7041e0834bb31811c83dd62d26edb985140f2942c9962ccd71c0d2995588a1b"
+      },
+      "stderr": {
+        "file": "native-real-pass.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "skipped": false,
+      "passed": true
+    },
+    {
+      "name": "malformed-skip",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-c",
+        "import sys; print(sys.argv[1]); sys.exit(int(sys.argv[2]))",
+        "not JSON",
+        "77"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 30,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T04:03:42Z",
+      "allowed_skip_reason": "projection kernel unavailable",
+      "exit_code": 77,
+      "stdout": {
+        "file": "malformed-skip.stdout",
+        "bytes": 9,
+        "sha256": "90801d4bc35f12b2a50a3a4fac96da0f3961980480459e6226c43803a7c56f74"
+      },
+      "stderr": {
+        "file": "malformed-skip.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "skipped": false,
+      "passed": false
+    },
+    {
+      "name": "wrong-reason",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-c",
+        "import sys; print(sys.argv[1]); sys.exit(int(sys.argv[2]))",
+        "{\"status\": \"skip\", \"reason\": \"unexpected\"}",
+        "77"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 30,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T04:03:42Z",
+      "allowed_skip_reason": "projection kernel unavailable",
+      "exit_code": 77,
+      "stdout": {
+        "file": "wrong-reason.stdout",
+        "bytes": 43,
+        "sha256": "41e2b17d7db1667778dcf21acab963515c5ad56529c97e4c0baa362f5a417d1f"
+      },
+      "stderr": {
+        "file": "wrong-reason.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "skipped": false,
+      "passed": false
+    },
+    {
+      "name": "wrong-exit",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-c",
+        "import sys; print(sys.argv[1]); sys.exit(int(sys.argv[2]))",
+        "{\"status\": \"skip\", \"reason\": \"projection kernel unavailable\"}",
+        "1"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 30,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T04:03:42Z",
+      "allowed_skip_reason": "projection kernel unavailable",
+      "exit_code": 1,
+      "stdout": {
+        "file": "wrong-exit.stdout",
+        "bytes": 62,
+        "sha256": "30668fb06a008a887df3b9537d104b3819a99407a60793673d003677d139f17a"
+      },
+      "stderr": {
+        "file": "wrong-exit.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "skipped": false,
+      "passed": false
+    }
+  ],
+  "skipped_commands": [
+    "avx2-allowed-skip"
+  ],
+  "assertions": [
+    {
+      "name": "avx2-allowed-skip",
+      "expected_pass": true,
+      "expected_skip": true,
+      "matched": true
+    },
+    {
+      "name": "avx2-skip-not-authorized",
+      "expected_pass": false,
+      "expected_skip": false,
+      "matched": true
+    },
+    {
+      "name": "native-real-pass",
+      "expected_pass": true,
+      "expected_skip": false,
+      "matched": true
+    },
+    {
+      "name": "malformed-skip",
+      "expected_pass": false,
+      "expected_skip": false,
+      "matched": true
+    },
+    {
+      "name": "wrong-reason",
+      "expected_pass": false,
+      "expected_skip": false,
+      "matched": true
+    },
+    {
+      "name": "wrong-exit",
+      "expected_pass": false,
+      "expected_skip": false,
+      "matched": true
+    }
+  ],
+  "source_sha256": {
+    "pf.c": "971913470e097088096e8e1419fb3e03777f61d1163e5d16119df2b323c37f98",
+    "bench/verify.py": "34de96b31810138c66b99fa0e46e8bb1aab3cd81a398910cdc1d07ca28ef58ae",
+    "bench/test_projection.c": "e617ee8793c443d4b361e78e44b7fe040e4863a036bd026cbec3fe4f92b49499"
+  },
+  "script_sha256": "d136b8360eefedcc27a6f3f2f5950545be40c0350e4d8e96866b9186c9190bc1"
+}

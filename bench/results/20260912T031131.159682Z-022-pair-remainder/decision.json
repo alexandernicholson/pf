@@ -1,0 +1,5 @@
+{
+  "iteration": 22,
+  "status": "rejected",
+  "reason": "Paired MoE remainder did not show consistent overall benefit."
+}

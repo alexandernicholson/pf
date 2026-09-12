@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "label": "031-packed-weight-tile",
+  "note": "Cache converted FP32 weight tile for experts with8+items to avoid repeated BF16 conversion.",
+  "started_utc": "2026-09-12T03:19:33.579779+00:00",
+  "status": "passed",
+  "synthetic_weights": true,
+  "arguments": {
+    "label": "031-packed-weight-tile",
+    "source": "/workspace/scratch/bd054ed0e458/pf-cloud/pf.c",
+    "cc": "cc",
+    "cflags": "-D_GNU_SOURCE -O3 -std=c11 -march=native -DPF_PACK_MOE",
+    "ldflags": "-lm -pthread",
+    "reps": 9,
+    "target_ms": 60.0,
+    "profile": "extended",
+    "parallel": true,
+    "results": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results",
+    "timeout": 180,
+    "note": "Cache converted FP32 weight tile for experts with8+items to avoid repeated BF16 conversion."
+  },
+  "git_head": {
+    "argv": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "returncode": 0,
+    "stdout": "a8476c8cebd0bb8c2b51ac2e4ce4289979d1ad04\n",
+    "stderr": "",
+    "wall_ns": 9833860
+  },
+  "git_status": {
+    "argv": [
+      "git",
+      "status",
+      "--porcelain=v1"
+    ],
+    "returncode": 0,
+    "stdout": " M bench/kernel_bench.c\n M bench/verify.py\n M pf.c\n?? bench/results/20260912T031003.208609Z-019-session2-baseline/\n?? bench/results/20260912T031031.542015Z-020-wide-singleton32/\n?? bench/results/20260912T031059.126002Z-021-wide-singleton64/\n?? bench/results/20260912T031131.159682Z-022-pair-remainder/\n?? bench/results/20260912T031337.893594Z-023-four-row-projection/\n?? bench/results/20260912T031425.923076Z-024-eight-row-projection/\n?? bench/results/20260912T031453.233495Z-025-combined-candidate/\n?? bench/results/20260912T031550.242682Z-026-combined-without-pair/\n?? bench/results/20260912T031625.855581Z-027-previous-version-control/\n?? bench/results/20260912T031658.936623Z-028-session2-final/\n?? bench/results/20260912T031734.802691Z-029-session2-final-repeat/\n?? bench/results/20260912T031908.225658Z-030-previous-version-repeat/\n?? bench/results/20260912T031933.552084Z-031-packed-weight-tile/\n?? bench/test_projection.c\n",
+    "stderr": "",
+    "wall_ns": 45844073
+  },
+  "sources": {
+    "pf.c": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/pf.c",
+      "sha256": "497ff51dfced1da0dd21ff241ba91df4bd4e3405c69fcb54f8170323e8ab11cb"
+    },
+    "unicode_tables.h": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/unicode_tables.h",
+      "sha256": "826b26d6af67789dea9100f88c8391ea61fffc19593a65b93789b3950f59b870"
+    },
+    "kernel_bench.c": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/kernel_bench.c",
+      "sha256": "cd2ece0eb2899b70128babdbcdb495bd0ec79c8bc9d9f36df1c7696887b5c1ff"
+    },
+    "run.py": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/run.py",
+      "sha256": "c3b56638e47e8f0860fed369c9852497a7af4d0edc741d3505f284c33d49c554"
+    },
+    "Makefile": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/Makefile",
+      "sha256": "5e07f29115126f03932b54f6e3e79bf3c05dccd8bbd9d78bc3d4fae83bce6164"
+    }
+  },
+  "compiler_version": {
+    "argv": [
+      "cc",
+      "--version"
+    ],
+    "returncode": 0,
+    "stdout": "cc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+    "stderr": "",
+    "wall_ns": 7585762
+  },
+  "build": {
+    "argv": [
+      "cc",
+      "-D_GNU_SOURCE",
+      "-O3",
+      "-std=c11",
+      "-march=native",
+      "-DPF_PACK_MOE",
+      "-DPF_BENCH_SOURCE=\"/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031933.552084Z-031-packed-weight-tile/source/pf.c\"",
+      "-I",
+      "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031933.552084Z-031-packed-weight-tile/source",
+      "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031933.552084Z-031-packed-weight-tile/source/kernel_bench.c",
+      "-o",
+      "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031933.552084Z-031-packed-weight-tile/kernel_bench",
+      "-lm",
+      "-pthread"
+    ],
+    "returncode": 0,
+    "wall_ns": 3949212920
+  },
+  "binary_sha256": "54ff1b87a861b9cdb946275c81887c880db0093b07ebf60ece60ca0c5f113768",
+  "run_argv": [
+    "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031933.552084Z-031-packed-weight-tile/kernel_bench",
+    "--reps",
+    "9",
+    "--target-ms",
+    "60.0",
+    "--profile",
+    "extended",
+    "--parallel"
+  ],
+  "process_wall_ns": 8821248902,
+  "process_rusage": {
+    "ru_utime": 31.458242,
+    "ru_stime": 1.040434,
+    "ru_minflt": 80682,
+    "ru_majflt": 0,
+    "ru_nvcsw": 24808,
+    "ru_nivcsw": 688
+  },
+  "cumulative_children_maxrss_kib": 321920,
+  "returncode": 0,
+  "parse_errors": [],
+  "completed_utc": "2026-09-12T03:19:46.461961+00:00",
+  "summary": {
+    "moe_e1_m1": {
+      "n": 9,
+      "median_ns": 120647.609877,
+      "min_ns": 114092.965432,
+      "max_ns": 126920.762963,
+      "mean_ns": 120098.62386822222,
+      "p10_ns": 114707.9560496,
+      "p90_ns": 125384.44691340001,
+      "stdev_ns": 4220.450161906594,
+      "hashes_stable": true
+    },
+    "moe_e1_m4": {
+      "n": 9,
+      "median_ns": 217372.393939,
+      "min_ns": 206386.723485,
+      "max_ns": 242745.920455,
+      "mean_ns": 219827.67297988888,
+      "p10_ns": 207345.08712100002,
+      "p90_ns": 235955.7446974,
+      "stdev_ns": 12772.992616413096,
+      "hashes_stable": true
+    },
+    "moe_e1_m16": {
+      "n": 9,
+      "median_ns": 583970.389474,
+      "min_ns": 549642.663158,
+      "max_ns": 731737.978947,
+      "mean_ns": 606207.225731,
+      "p10_ns": 562486.4442108,
+      "p90_ns": 682284.5726318,
+      "stdev_ns": 58293.940512922374,
+      "hashes_stable": true
+    },
+    "moe_e32_m1": {
+      "n": 9,
+      "median_ns": 2575883.444444,
+      "min_ns": 2003309.444444,
+      "max_ns": 3404317.555556,
+      "mean_ns": 2539083.925926,
+      "p10_ns": 2053065.5333336,
+      "p90_ns": 3184903.5111112,
+      "stdev_ns": 499529.54299845954,
+      "hashes_stable": true
+    },
+    "moe_e128_m1": {
+      "n": 9,
+      "median_ns": 7019490.8,
+      "min_ns": 6249666.8,
+      "max_ns": 36526304.8,
+      "mean_ns": 11113957.933333334,
+      "p10_ns": 6406261.5200000005,
+      "p90_ns": 16686871.040000003,
+      "stdev_ns": 9750908.570477724,
+      "hashes_stable": true
+    },
+    "moe_e32_m4": {
+      "n": 9,
+      "median_ns": 4184809.368421,
+      "min_ns": 3616634.736842,
+      "max_ns": 5388643.736842,
+      "mean_ns": 4249400.988304,
+      "p10_ns": 3791893.7263156,
+      "p90_ns": 4889526.347368401,
+      "stdev_ns": 536742.8779979986,
+      "hashes_stable": true
+    },
+    "projection_qkv": {
+      "n": 9,
+      "median_ns": 65449.311307,
+      "min_ns": 61378.63583,
+      "max_ns": 79467.521292,
+      "mean_ns": 67278.61706644445,
+      "p10_ns": 63695.609691599995,
+      "p90_ns": 72330.3042584,
+      "stdev_ns": 5237.177190322873,
+      "hashes_stable": true
+    },
+    "projection_out": {
+      "n": 9,
+      "median_ns": 41708.178571,
+      "min_ns": 37109.071429,
+      "max_ns": 47234.703782,
+      "mean_ns": 41740.97724088889,
+      "p10_ns": 37329.5966386,
+      "p90_ns": 45546.0474788,
+      "stdev_ns": 3424.481905643348,
+      "hashes_stable": true
+    },
+    "phase_b_t32": {
+      "n": 9,
+      "median_ns": 517822.796117,
+      "min_ns": 376608.38835,
+      "max_ns": 724565.572816,
+      "mean_ns": 518766.9395902222,
+      "p10_ns": 377763.3009708,
+      "p90_ns": 620916.431068,
+      "stdev_ns": 107353.82230555029,
+      "hashes_stable": true
+    },
+    "phase_b_t256": {
+      "n": 9,
+      "median_ns": 5409062.142857,
+      "min_ns": 4351411.714286,
+      "max_ns": 6253536.214286,
+      "mean_ns": 5369864.158730222,
+      "p10_ns": 4766619.5428572,
+      "p90_ns": 5946543.6428572,
+      "stdev_ns": 583518.5935236634,
+      "hashes_stable": true
+    },
+    "phase_b_packed_t256_s32": {
+      "n": 9,
+      "median_ns": 2735060.684211,
+      "min_ns": 2288648.736842,
+      "max_ns": 5699960.105263,
+      "mean_ns": 3425894.871345,
+      "p10_ns": 2325911.4736844003,
+      "p90_ns": 4813161.705263001,
+      "stdev_ns": 1233231.211527851,
+      "hashes_stable": true
+    },
+    "layer_t32": {
+      "n": 9,
+      "median_ns": 8366120.625,
+      "min_ns": 6685805.375,
+      "max_ns": 9656861.75,
+      "mean_ns": 8230937.0,
+      "p10_ns": 7351194.375,
+      "p90_ns": 9080627.85,
+      "stdev_ns": 894844.9065798576,
+      "hashes_stable": true
+    },
+    "layer_packed_t256_s32": {
+      "n": 9,
+      "median_ns": 21577327.0,
+      "min_ns": 16619238.666667,
+      "max_ns": 24924585.666667,
+      "mean_ns": 21136691.814815,
+      "p10_ns": 17792304.266667,
+      "p90_ns": 24276736.066666998,
+      "stdev_ns": 2960592.5530166784,
+      "hashes_stable": true
+    }
+  }
+}

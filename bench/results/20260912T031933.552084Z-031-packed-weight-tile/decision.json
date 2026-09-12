@@ -1,0 +1,5 @@
+{
+  "iteration": 31,
+  "status": "rejected",
+  "reason": "Weight preconversion improved isolated expert wall time but packed-layer CPU cost rose to 198.8 ms versus retained runs 163.0/174.9 ms. Wall results were noisy; added complexity rejected."
+}

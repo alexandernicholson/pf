@@ -1,0 +1,5 @@
+{
+  "iteration": 20,
+  "status": "rejected",
+  "reason": "32-lane singleton candidate; 64 lanes performed better."
+}

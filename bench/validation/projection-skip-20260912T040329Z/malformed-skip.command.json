@@ -1,0 +1,34 @@
+{
+  "name": "malformed-skip",
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-c",
+    "import sys; print(sys.argv[1]); sys.exit(int(sys.argv[2]))",
+    "not JSON",
+    "77"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 30,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T04:03:42Z",
+  "allowed_skip_reason": "projection kernel unavailable",
+  "exit_code": 77,
+  "stdout": {
+    "file": "malformed-skip.stdout",
+    "bytes": 9,
+    "sha256": "90801d4bc35f12b2a50a3a4fac96da0f3961980480459e6226c43803a7c56f74"
+  },
+  "stderr": {
+    "file": "malformed-skip.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "skipped": false,
+  "passed": false
+}

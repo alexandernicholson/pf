@@ -1,0 +1,5 @@
+{
+  "iteration": 26,
+  "status": "accepted",
+  "reason": "Wide singleton plus eight-row projection, without paired remainder."
+}

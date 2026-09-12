@@ -1,0 +1,38 @@
+{
+  "name": "build-native",
+  "argv": [
+    "cc",
+    "-O3",
+    "-std=c11",
+    "-pthread",
+    "-march=native",
+    "bench/test_projection.c",
+    "-lm",
+    "-o",
+    "/tmp/pf-projection-skip-x9jy7ula/native"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 30,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T04:03:38Z",
+  "allowed_skip_reason": null,
+  "exit_code": 0,
+  "stdout": {
+    "file": "build-native.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "build-native.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "skipped": false,
+  "passed": true
+}

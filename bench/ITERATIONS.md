@@ -57,7 +57,7 @@ contains all repetitions and evidence, including rejected attempts.
 | [017-control-repeat-threads8](results/20260912T024838.865216Z-017-control-repeat-threads8) | control | 8 | 2.083 | 35.876 | Independent repeated eight-worker control after final candidate. |
 | [018-sparse-fast-path](results/20260912T025038.223913Z-018-sparse-fast-path) | rejected | 8 | 0.670 | 27.458 | Direct singleton dispatch adds complexity without consistent measured gain; short-layer timing regressed in this trial. Restored exact source from014/016. |
 
-## Final comparison
+## Session 1 comparison
 
 Both configurations use eight workers and the final harness. Pooled medians
 use 18 samples across two independent runs for each variant: controls013/017,
@@ -110,7 +110,7 @@ to refresh the offline chart. For a control, use:
 
 ```sh
 PF_THREADS=8 python3 bench/run.py --label control --parallel --profile extended \
-  --cflags '-D_GNU_SOURCE -O3 -std=c11 -march=native -DPF_NO_X86_MOE'
+  --cflags '-D_GNU_SOURCE -O3 -std=c11 -march=native -DPF_NO_X86_MOE -DPF_NO_PROJ4 -DPF_NO_WIDE_AXPY'
 ```
 
 Change one factor, record a new uniquely labeled run, compare outputs and timing,
@@ -120,3 +120,49 @@ checkpoint access is available, complete model-level regression before treating
 these synthetic results as deployment evidence. Next meaningful experiments
 are trained-router distributions, longer packed inputs and model-resident
 request latency; no background benchmark process remains running.
+
+## Session 2: wider singleton and shared-input projections
+
+Runs 019–031 continue from the previously delivered implementation. All use eight workers and the extended synthetic suite. Runs 027–030 use the same current harness, with the exact old source as control, in control/candidate/candidate/control order. Every run preserves complete raw records, resource counters and source, including rejected variants.
+
+| Run | Decision | Packed layer ms | Reason |
+| --- | --- | ---: | --- |
+| [019](results/20260912T031003.208609Z-019-session2-baseline) | control | 28.347 | Fresh previous-version baseline. |
+| [020](results/20260912T031031.542015Z-020-wide-singleton32) | rejected | 24.956 | 32-lane singleton candidate; 64 lanes performed better. |
+| [021](results/20260912T031059.126002Z-021-wide-singleton64) | accepted | 22.515 | 64-lane singleton candidate reduced cached singleton time; retained in final combined source. |
+| [022](results/20260912T031131.159682Z-022-pair-remainder) | rejected | 27.284 | Paired MoE remainder did not show consistent overall benefit. |
+| [023](results/20260912T031337.893594Z-023-four-row-projection) | superseded | 24.652 | Four-row projection improved projection time; eight rows selected next. |
+| [024](results/20260912T031425.923076Z-024-eight-row-projection) | accepted | 20.865 | Eight-row projection improved output projection and packed phase B; retained. |
+| [025](results/20260912T031453.233495Z-025-combined-candidate) | rejected | 20.613 | Combined candidate included paired remainder; simpler version selected after comparison. |
+| [026](results/20260912T031550.242682Z-026-combined-without-pair) | accepted | 22.635 | Wide singleton plus eight-row projection, without paired remainder. |
+| [027](results/20260912T031625.855581Z-027-previous-version-control) | control | 24.777 | Exact previously delivered source with current harness; forward comparison. |
+| [028](results/20260912T031658.936623Z-028-session2-final) | accepted | 21.870 | Final default-on 64-lane singleton and eight-row projection. |
+| [029](results/20260912T031734.802691Z-029-session2-final-repeat) | accepted | 25.034 | Independent repeat of final selected source. |
+| [030](results/20260912T031908.225658Z-030-previous-version-repeat) | control | 28.787 | Exact previous source repeated after candidate to expose scheduling drift. |
+| [031](results/20260912T031933.552084Z-031-packed-weight-tile) | rejected | 21.577 | Weight preconversion improved isolated expert wall time but packed-layer CPU cost rose to 198.8 ms versus retained runs 163.0/174.9 ms. Wall results were noisy; added complexity rejected. |
+
+Final comparisons pool 22 samples per case and variant from controls 027/030 and candidates 028/029. Scheduling noise remains substantial: these are measured medians, not confidence bounds or whole-model throughput claims. CPU time is process CPU per invocation, including all workers.
+
+| Workload | Previous wall ms | New wall ms | Wall speedup | Previous CPU ms | New CPU ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| moe_e1_m1 | 0.128 | 0.119 | 1.08× | 0.128 | 0.119 |
+| moe_e1_m4 | 0.218 | 0.207 | 1.06× | 0.218 | 0.206 |
+| moe_e1_m16 | 0.661 | 0.640 | 1.03× | 0.661 | 0.640 |
+| moe_e32_m1 | 2.162 | 2.156 | 1.00× | 13.448 | 13.067 |
+| moe_e128_m1 | 7.911 | 7.589 | 1.04× | 57.350 | 54.397 |
+| moe_e32_m4 | 3.757 | 3.776 | 0.99× | 24.621 | 24.454 |
+| projection_qkv | 0.096 | 0.065 | 1.47× | 0.096 | 0.065 |
+| projection_out | 0.064 | 0.038 | 1.66× | 0.064 | 0.038 |
+| phase_b_t32 | 0.627 | 0.599 | 1.05× | 3.654 | 2.832 |
+| phase_b_t256 | 6.388 | 5.437 | 1.17× | 46.775 | 39.201 |
+| phase_b_packed_t256_s32 | 3.874 | 2.885 | 1.34× | 28.466 | 20.916 |
+| layer_t32 | 8.435 | 8.215 | 1.03× | 56.489 | 54.065 |
+| layer_packed_t256_s32 | 27.365 | 22.987 | 1.19× | 203.022 | 167.386 |
+
+The singleton change widens independent output accumulators to 64 lanes while preserving each output’s FMA order. The projection change shares input loads across eight rows while retaining the original two-chain dot-product reduction exactly. Both are AVX-512 guarded; existing AVX2 and ARM paths remain available. `PF_NO_WIDE_AXPY` and `PF_NO_PROJ4` disable the respective additions; `PF_PROJ_ROWS` selects 1–8 rows and `PF_AXPY_NV` selects 1–8 groups of 16 output lanes. No paired-remainder or weight-packing experiment remains in the selected source.
+
+Selected source SHA256: `971913470e097088096e8e1419fb3e03777f61d1163e5d16119df2b323c37f98`. All 13 cases in every session-2 trial match run 019 bitwise, with no failed reference values or unstable sample hashes; see `cross-run-checks-session2.json`. The projection tests additionally exercise input/output tails, bias, residual addition and output guards against an independent scalar FMA oracle. Full-model validation remains blocked by unavailable checkpoint downloads.
+
+Session-2 validation: all 31 build, smoke, bitwise correctness, sanitizer and pool commands passed in `validation/verify-20260912T032225Z-63f1b94d/`. Native and sanitized projection checks each compared 5,404 outputs with zero bitwise mismatches.
+
+Final review fixed projection-test skip handling on x86 hosts without AVX-512. A focused regression using the real AVX2 and native binaries passed six assertions, including rejection of malformed or unauthorized skips; see `validation/projection-skip-20260912T040329Z/`. Review also independently reproduced every wall and CPU median in `comparison-session2.json`.

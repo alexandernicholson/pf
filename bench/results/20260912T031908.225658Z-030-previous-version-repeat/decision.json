@@ -1,0 +1,5 @@
+{
+  "iteration": 30,
+  "status": "control",
+  "reason": "Exact previous source repeated after candidate to expose scheduling drift."
+}

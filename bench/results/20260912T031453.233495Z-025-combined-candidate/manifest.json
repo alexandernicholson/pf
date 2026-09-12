@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "label": "025-combined-candidate",
+  "note": "Combine singleton64,projection8,and pair-remainder sharing; verify no numerical interaction.",
+  "started_utc": "2026-09-12T03:14:53.260616+00:00",
+  "status": "passed",
+  "synthetic_weights": true,
+  "arguments": {
+    "label": "025-combined-candidate",
+    "source": "/workspace/scratch/bd054ed0e458/pf-cloud/pf.c",
+    "cc": "cc",
+    "cflags": "-D_GNU_SOURCE -O3 -std=c11 -march=native -DPF_WIDE_AXPY -DPF_AXPY_NV=4 -DPF_PROJ4 -DPF_PROJ_ROWS=8 -DPF_MOE_PAIR",
+    "ldflags": "-lm -pthread",
+    "reps": 9,
+    "target_ms": 60.0,
+    "profile": "extended",
+    "parallel": true,
+    "results": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results",
+    "timeout": 180,
+    "note": "Combine singleton64,projection8,and pair-remainder sharing; verify no numerical interaction."
+  },
+  "git_head": {
+    "argv": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "returncode": 0,
+    "stdout": "a8476c8cebd0bb8c2b51ac2e4ce4289979d1ad04\n",
+    "stderr": "",
+    "wall_ns": 11947440
+  },
+  "git_status": {
+    "argv": [
+      "git",
+      "status",
+      "--porcelain=v1"
+    ],
+    "returncode": 0,
+    "stdout": " M bench/kernel_bench.c\n M pf.c\n?? bench/results/20260912T031003.208609Z-019-session2-baseline/\n?? bench/results/20260912T031031.542015Z-020-wide-singleton32/\n?? bench/results/20260912T031059.126002Z-021-wide-singleton64/\n?? bench/results/20260912T031131.159682Z-022-pair-remainder/\n?? bench/results/20260912T031337.893594Z-023-four-row-projection/\n?? bench/results/20260912T031425.923076Z-024-eight-row-projection/\n?? bench/results/20260912T031453.233495Z-025-combined-candidate/\n",
+    "stderr": "",
+    "wall_ns": 20071897
+  },
+  "sources": {
+    "pf.c": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/pf.c",
+      "sha256": "7bad4571aa765f08231b6f0f3ca057aec80abaadc47ef55c67e0af2b0aa6787d"
+    },
+    "unicode_tables.h": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/unicode_tables.h",
+      "sha256": "826b26d6af67789dea9100f88c8391ea61fffc19593a65b93789b3950f59b870"
+    },
+    "kernel_bench.c": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/kernel_bench.c",
+      "sha256": "cd2ece0eb2899b70128babdbcdb495bd0ec79c8bc9d9f36df1c7696887b5c1ff"
+    },
+    "run.py": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/run.py",
+      "sha256": "c3b56638e47e8f0860fed369c9852497a7af4d0edc741d3505f284c33d49c554"
+    },
+    "Makefile": {
+      "original_path": "/workspace/scratch/bd054ed0e458/pf-cloud/Makefile",
+      "sha256": "5e07f29115126f03932b54f6e3e79bf3c05dccd8bbd9d78bc3d4fae83bce6164"
+    }
+  },
+  "compiler_version": {
+    "argv": [
+      "cc",
+      "--version"
+    ],
+    "returncode": 0,
+    "stdout": "cc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+    "stderr": "",
+    "wall_ns": 13564962
+  },
+  "build": {
+    "argv": [
+      "cc",
+      "-D_GNU_SOURCE",
+      "-O3",
+      "-std=c11",
+      "-march=native",
+      "-DPF_WIDE_AXPY",
+      "-DPF_AXPY_NV=4",
+      "-DPF_PROJ4",
+      "-DPF_PROJ_ROWS=8",
+      "-DPF_MOE_PAIR",
+      "-DPF_BENCH_SOURCE=\"/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031453.233495Z-025-combined-candidate/source/pf.c\"",
+      "-I",
+      "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031453.233495Z-025-combined-candidate/source",
+      "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031453.233495Z-025-combined-candidate/source/kernel_bench.c",
+      "-o",
+      "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031453.233495Z-025-combined-candidate/kernel_bench",
+      "-lm",
+      "-pthread"
+    ],
+    "returncode": 0,
+    "wall_ns": 3825319711
+  },
+  "binary_sha256": "8d922e6834ab9d945d3f19d86ea3aacb5c68de76aef91c831cf3bf452d4358d3",
+  "run_argv": [
+    "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T031453.233495Z-025-combined-candidate/kernel_bench",
+    "--reps",
+    "9",
+    "--target-ms",
+    "60.0",
+    "--profile",
+    "extended",
+    "--parallel"
+  ],
+  "process_wall_ns": 8979188768,
+  "process_rusage": {
+    "ru_utime": 32.75013,
+    "ru_stime": 1.072529,
+    "ru_minflt": 80668,
+    "ru_majflt": 0,
+    "ru_nvcsw": 24580,
+    "ru_nivcsw": 908
+  },
+  "cumulative_children_maxrss_kib": 321792,
+  "returncode": 0,
+  "parse_errors": [],
+  "completed_utc": "2026-09-12T03:15:06.155712+00:00",
+  "summary": {
+    "moe_e1_m1": {
+      "n": 9,
+      "median_ns": 115917.992443,
+      "min_ns": 114029.015113,
+      "max_ns": 121616.173804,
+      "mean_ns": 116627.99608155555,
+      "p10_ns": 114761.7949618,
+      "p90_ns": 119703.653904,
+      "stdev_ns": 2390.4565332771826,
+      "hashes_stable": true
+    },
+    "moe_e1_m4": {
+      "n": 9,
+      "median_ns": 212568.992593,
+      "min_ns": 198722.585185,
+      "max_ns": 295736.092593,
+      "mean_ns": 228383.83045277777,
+      "p10_ns": 206620.25925940002,
+      "p90_ns": 271329.03185220005,
+      "stdev_ns": 31993.289097896464,
+      "hashes_stable": true
+    },
+    "moe_e1_m16": {
+      "n": 9,
+      "median_ns": 616975.43956,
+      "min_ns": 598182.351648,
+      "max_ns": 661659.747253,
+      "mean_ns": 624899.3894992222,
+      "p10_ns": 604414.3956040001,
+      "p90_ns": 656835.3956042,
+      "stdev_ns": 22086.822328043716,
+      "hashes_stable": true
+    },
+    "moe_e32_m1": {
+      "n": 9,
+      "median_ns": 2209556.947368,
+      "min_ns": 1940578.052632,
+      "max_ns": 3365871.894737,
+      "mean_ns": 2388367.5672515556,
+      "p10_ns": 2021261.8421056,
+      "p90_ns": 3107686.8421050003,
+      "stdev_ns": 483383.58253352094,
+      "hashes_stable": true
+    },
+    "moe_e128_m1": {
+      "n": 9,
+      "median_ns": 7649167.777778,
+      "min_ns": 6367205.222222,
+      "max_ns": 9134285.777778,
+      "mean_ns": 7766747.543209889,
+      "p10_ns": 6924805.7555556,
+      "p90_ns": 8540868.177778,
+      "stdev_ns": 794013.468684673,
+      "hashes_stable": true
+    },
+    "moe_e32_m4": {
+      "n": 9,
+      "median_ns": 3811332.538462,
+      "min_ns": 2959575.884615,
+      "max_ns": 4744247.769231,
+      "mean_ns": 3861156.2008546665,
+      "p10_ns": 3311261.484615,
+      "p90_ns": 4569087.0923078,
+      "stdev_ns": 557153.4132382997,
+      "hashes_stable": true
+    },
+    "projection_qkv": {
+      "n": 9,
+      "median_ns": 75760.108298,
+      "min_ns": 60398.105485,
+      "max_ns": 94479.040788,
+      "mean_ns": 75512.12455066666,
+      "p10_ns": 61326.8773554,
+      "p90_ns": 93469.6950776,
+      "stdev_ns": 13413.55063820526,
+      "hashes_stable": true
+    },
+    "projection_out": {
+      "n": 9,
+      "median_ns": 42244.651572,
+      "min_ns": 37861.679245,
+      "max_ns": 52090.203774,
+      "mean_ns": 43736.010901444446,
+      "p10_ns": 38705.3632706,
+      "p90_ns": 49962.379874,
+      "stdev_ns": 4867.407408372286,
+      "hashes_stable": true
+    },
+    "phase_b_t32": {
+      "n": 9,
+      "median_ns": 534805.072917,
+      "min_ns": 419254.364583,
+      "max_ns": 655476.104167,
+      "mean_ns": 543747.9872684445,
+      "p10_ns": 462859.914583,
+      "p90_ns": 637149.9374998,
+      "stdev_ns": 83172.46484178727,
+      "hashes_stable": true
+    },
+    "phase_b_t256": {
+      "n": 9,
+      "median_ns": 5566322.444444,
+      "min_ns": 4742974.222222,
+      "max_ns": 8354728.555556,
+      "mean_ns": 6082927.123456666,
+      "p10_ns": 5090626.133333201,
+      "p90_ns": 7533489.7111112,
+      "stdev_ns": 1189741.1451360567,
+      "hashes_stable": true
+    },
+    "phase_b_packed_t256_s32": {
+      "n": 9,
+      "median_ns": 3299708.4,
+      "min_ns": 2675627.15,
+      "max_ns": 3864166.3,
+      "mean_ns": 3250173.683333333,
+      "p10_ns": 2778166.39,
+      "p90_ns": 3753591.38,
+      "stdev_ns": 410712.3308559829,
+      "hashes_stable": true
+    },
+    "layer_t32": {
+      "n": 9,
+      "median_ns": 9493961.857143,
+      "min_ns": 7494726.857143,
+      "max_ns": 11461138.714286,
+      "mean_ns": 9340691.539682666,
+      "p10_ns": 8308419.7714286,
+      "p90_ns": 10422551.0571428,
+      "stdev_ns": 1170987.5200508153,
+      "hashes_stable": true
+    },
+    "layer_packed_t256_s32": {
+      "n": 9,
+      "median_ns": 20613267.5,
+      "min_ns": 18555832.5,
+      "max_ns": 24482736.5,
+      "mean_ns": 20942119.722222224,
+      "p10_ns": 19023290.5,
+      "p90_ns": 23427064.1,
+      "stdev_ns": 1860907.419576151,
+      "hashes_stable": true
+    }
+  }
+}

@@ -142,8 +142,9 @@ pthread pool elsewhere; no other dependencies. Linux build:
 
 The x86 expert path now reuses BF16 weights across four tokens with AVX2/FMA or
 AVX-512 (when compiled for a supporting CPU). It preserves FP32 activations and
-the original increasing-k FMA order. Sparse single-token experts retain the
-original matrix-vector kernel. The existing ARM kernels are unchanged.
+the original increasing-k FMA order. AVX-512 single-token experts use 64-lane
+output accumulation. Dense projections share input loads across eight rows
+while preserving the original dot-product reduction order. The existing ARM kernels are unchanged.
 
 The pthread pool defaults to the usable CPU count, bounded by affinity and the
 cgroup-v2 quota at `/sys/fs/cgroup/cpu.max` when available. Nested ancestor or

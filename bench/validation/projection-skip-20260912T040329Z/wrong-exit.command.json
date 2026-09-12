@@ -1,0 +1,34 @@
+{
+  "name": "wrong-exit",
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-c",
+    "import sys; print(sys.argv[1]); sys.exit(int(sys.argv[2]))",
+    "{\"status\": \"skip\", \"reason\": \"projection kernel unavailable\"}",
+    "1"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 30,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T04:03:42Z",
+  "allowed_skip_reason": "projection kernel unavailable",
+  "exit_code": 1,
+  "stdout": {
+    "file": "wrong-exit.stdout",
+    "bytes": 62,
+    "sha256": "30668fb06a008a887df3b9537d104b3819a99407a60793673d003677d139f17a"
+  },
+  "stderr": {
+    "file": "wrong-exit.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "skipped": false,
+  "passed": false
+}

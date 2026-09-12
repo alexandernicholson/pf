@@ -1,0 +1,20 @@
+In file included from bench/test_projection.c:3:
+bench/../pf.c: In function ‘moe_block’:
+bench/../pf.c:1329:5: warning: ‘xp’ may be used uninitialized [-Wmaybe-uninitialized]
+ 1329 |     moe_gemm_x86(w1, xp, yp, m, D, 2 * FF);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bench/../pf.c:417:13: note: by argument 2 of type ‘const float * const*’ to ‘moe_gemm_x86’ declared here
+  417 | static void moe_gemm_x86(const bf16 *w, const float *const *xs, float *const *ys,
+      |             ^~~~~~~~~~~~
+bench/../pf.c:1323:18: note: ‘xp’ declared here
+ 1323 |     const float *xp[MOE_B]; float *yp[MOE_B];
+      |                  ^~
+bench/../pf.c:1329:5: warning: ‘yp’ may be used uninitialized [-Wmaybe-uninitialized]
+ 1329 |     moe_gemm_x86(w1, xp, yp, m, D, 2 * FF);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bench/../pf.c:417:13: note: by argument 3 of type ‘float * const*’ to ‘moe_gemm_x86’ declared here
+  417 | static void moe_gemm_x86(const bf16 *w, const float *const *xs, float *const *ys,
+      |             ^~~~~~~~~~~~
+bench/../pf.c:1323:36: note: ‘yp’ declared here
+ 1323 |     const float *xp[MOE_B]; float *yp[MOE_B];
+      |                                    ^~

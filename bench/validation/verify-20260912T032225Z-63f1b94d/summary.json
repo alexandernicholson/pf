@@ -1,0 +1,1083 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "scope": "compilation and correctness only; no model inference or performance measurements",
+  "invocation": [
+    "bench/verify.py"
+  ],
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.39",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "source_sha256": {
+    "pf.c": "971913470e097088096e8e1419fb3e03777f61d1163e5d16119df2b323c37f98",
+    "unicode_tables.h": "826b26d6af67789dea9100f88c8391ea61fffc19593a65b93789b3950f59b870",
+    "bench/test_x86_moe.c": "3dc010c2bbe660fe8af9a450a249ec7aa4b0f69d9f510307bb81f7a85a1ba745",
+    "bench/test_pool.c": "67a57a8a64d41ebc2ba09c69cd175250d7fb9c9b74e8a4d3f5928cf4f4c76684",
+    "bench/test_projection.c": "e617ee8793c443d4b361e78e44b7fe040e4863a036bd026cbec3fe4f92b49499",
+    "bench/verify.py": "c7689da87b0667612fa4fc2b6d3586b6e0955c68eab9de7b74a6202ca6d1505a"
+  },
+  "expected_pf_sha256": null,
+  "reused_production_summary": null,
+  "reused_correctness_summary": null,
+  "sanitizer_scope": "ASan and UBSan; leak scanning disabled because this environment denies /proc task access",
+  "commands": [
+    {
+      "name": "compiler-version",
+      "argv": [
+        "cc",
+        "--version"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:25Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "compiler-version.stdout",
+        "bytes": 243,
+        "sha256": "e412d6c932acaaea35c743bc158d4ba2400ca0e3df66df406a872b2ce0f8601b"
+      },
+      "stderr": {
+        "file": "compiler-version.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-pf-native",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-Werror",
+        "-march=native",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/pf-native",
+        "pf.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:25Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-pf-native.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-pf-native.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "smoke-native",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pf-native"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:28Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "smoke-native.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "smoke-native.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-pf-avx2-fma",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-Werror",
+        "-march=x86-64",
+        "-mavx2",
+        "-mfma",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/pf-avx2-fma",
+        "pf.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:28Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-pf-avx2-fma.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-pf-avx2-fma.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "smoke-avx2-fma",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pf-avx2-fma"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:31Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "smoke-avx2-fma.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "smoke-avx2-fma.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-pf-scalar",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-Werror",
+        "-march=x86-64",
+        "-mno-avx",
+        "-mno-avx2",
+        "-mno-fma",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/pf-scalar",
+        "pf.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:31Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-pf-scalar.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-pf-scalar.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "smoke-scalar",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pf-scalar"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:34Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "smoke-scalar.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "smoke-scalar.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-pf-avx2-no-fma",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-Werror",
+        "-march=x86-64",
+        "-mavx2",
+        "-mno-fma",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/pf-avx2-no-fma",
+        "pf.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:34Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-pf-avx2-no-fma.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-pf-avx2-no-fma.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "smoke-avx2-no-fma",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pf-avx2-no-fma"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:36Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "smoke-avx2-no-fma.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "smoke-avx2-no-fma.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-moe-native",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-march=native",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/moe-native",
+        "bench/test_x86_moe.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:36Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-moe-native.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-moe-native.stderr",
+        "bytes": 2391,
+        "sha256": "13e2cbad3adc218c0a63fc93703bb641f2c4df1f0f35db76a1f6e24d77a13a86"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-moe-native",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/moe-native"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:39Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "test-moe-native.stdout",
+        "bytes": 6242,
+        "sha256": "a4bded8c487154c19c9a7c3db39e108771f9fbe229502da4f1abf21a0b0c724c"
+      },
+      "stderr": {
+        "file": "test-moe-native.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-moe-avx2-fma",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-march=x86-64",
+        "-mavx2",
+        "-mfma",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/moe-avx2-fma",
+        "bench/test_x86_moe.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:40Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-moe-avx2-fma.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-moe-avx2-fma.stderr",
+        "bytes": 2447,
+        "sha256": "69f2d4abd82c13f4fa9033de9a934cbefe599cfc08b68c65451a455d0ac0c7c6"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-moe-avx2-fma",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/moe-avx2-fma"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:43Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "test-moe-avx2-fma.stdout",
+        "bytes": 6241,
+        "sha256": "cb4538cbfdc08c25413814c438460122bbd6ff33b84a95410429882fd5cbc9a9"
+      },
+      "stderr": {
+        "file": "test-moe-avx2-fma.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-moe-sanitized",
+      "argv": [
+        "cc",
+        "-O1",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-march=native",
+        "-g",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/moe-sanitized",
+        "bench/test_x86_moe.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:43Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-moe-sanitized.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-moe-sanitized.stderr",
+        "bytes": 1229,
+        "sha256": "a804b3d288abb1f0dbe940a1f470184e06939249117e14e6c8cfbb40bb62963d"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-moe-sanitized",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/moe-sanitized"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+        "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:49Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "test-moe-sanitized.stdout",
+        "bytes": 6242,
+        "sha256": "a4bded8c487154c19c9a7c3db39e108771f9fbe229502da4f1abf21a0b0c724c"
+      },
+      "stderr": {
+        "file": "test-moe-sanitized.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-projection-native",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-march=native",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/projection-native",
+        "bench/test_projection.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:49Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-projection-native.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-projection-native.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-projection-native",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/projection-native"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:53Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "test-projection-native.stdout",
+        "bytes": 68,
+        "sha256": "b7041e0834bb31811c83dd62d26edb985140f2942c9962ccd71c0d2995588a1b"
+      },
+      "stderr": {
+        "file": "test-projection-native.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-projection-sanitized",
+      "argv": [
+        "cc",
+        "-O1",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-march=native",
+        "-g",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/projection-sanitized",
+        "bench/test_projection.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:53Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-projection-sanitized.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-projection-sanitized.stderr",
+        "bytes": 1231,
+        "sha256": "54e6d17763969c1176837adce01f1055d33103588f8a143ecc2a12ec10ba1c65"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-projection-sanitized",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/projection-sanitized"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+        "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:58Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "test-projection-sanitized.stdout",
+        "bytes": 68,
+        "sha256": "b7041e0834bb31811c83dd62d26edb985140f2942c9962ccd71c0d2995588a1b"
+      },
+      "stderr": {
+        "file": "test-projection-sanitized.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "build-pool",
+      "argv": [
+        "cc",
+        "-O3",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pthread",
+        "-march=native",
+        "-o",
+        "/tmp/pf-verify-wyj58ma4/pool",
+        "bench/test_pool.c",
+        "-lm"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {},
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:22:58Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "build-pool.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "build-pool.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-1",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "1"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "test-pool-1.stdout",
+        "bytes": 59,
+        "sha256": "3a8323698585096ecd1f67d1d0e23afd8bc8ed35e9aed55effb4fc91932fa27f"
+      },
+      "stderr": {
+        "file": "test-pool-1.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-2",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "2"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "test-pool-2.stdout",
+        "bytes": 59,
+        "sha256": "3a8323698585096ecd1f67d1d0e23afd8bc8ed35e9aed55effb4fc91932fa27f"
+      },
+      "stderr": {
+        "file": "test-pool-2.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-4",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "4"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "test-pool-4.stdout",
+        "bytes": 59,
+        "sha256": "3a8323698585096ecd1f67d1d0e23afd8bc8ed35e9aed55effb4fc91932fa27f"
+      },
+      "stderr": {
+        "file": "test-pool-4.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-8",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "8"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 0,
+      "expected_stderr_substring": null,
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 0,
+      "stdout": {
+        "file": "test-pool-8.stdout",
+        "bytes": 59,
+        "sha256": "3a8323698585096ecd1f67d1d0e23afd8bc8ed35e9aed55effb4fc91932fa27f"
+      },
+      "stderr": {
+        "file": "test-pool-8.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-invalid-0",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "0"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 1,
+      "expected_stderr_substring": "PF_THREADS must be an integer from 1 to 64",
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 1,
+      "stdout": {
+        "file": "test-pool-invalid-0.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "test-pool-invalid-0.stderr",
+        "bytes": 47,
+        "sha256": "fcbac0d7068430687cb25e84bb530d4e4b4bdee6995304e4c1f3e16e7f70a3f6"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-invalid-1",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "-1"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 1,
+      "expected_stderr_substring": "PF_THREADS must be an integer from 1 to 64",
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 1,
+      "stdout": {
+        "file": "test-pool-invalid-1.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "test-pool-invalid-1.stderr",
+        "bytes": 47,
+        "sha256": "fcbac0d7068430687cb25e84bb530d4e4b4bdee6995304e4c1f3e16e7f70a3f6"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-invalid-2",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "65"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 1,
+      "expected_stderr_substring": "PF_THREADS must be an integer from 1 to 64",
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 1,
+      "stdout": {
+        "file": "test-pool-invalid-2.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "test-pool-invalid-2.stderr",
+        "bytes": 47,
+        "sha256": "fcbac0d7068430687cb25e84bb530d4e4b4bdee6995304e4c1f3e16e7f70a3f6"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-invalid-3",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "abc"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 1,
+      "expected_stderr_substring": "PF_THREADS must be an integer from 1 to 64",
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 1,
+      "stdout": {
+        "file": "test-pool-invalid-3.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "test-pool-invalid-3.stderr",
+        "bytes": 47,
+        "sha256": "fcbac0d7068430687cb25e84bb530d4e4b4bdee6995304e4c1f3e16e7f70a3f6"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-invalid-4",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "1x"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 1,
+      "expected_stderr_substring": "PF_THREADS must be an integer from 1 to 64",
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 1,
+      "stdout": {
+        "file": "test-pool-invalid-4.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "test-pool-invalid-4.stderr",
+        "bytes": 47,
+        "sha256": "fcbac0d7068430687cb25e84bb530d4e4b4bdee6995304e4c1f3e16e7f70a3f6"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-invalid-5",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": ""
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 1,
+      "expected_stderr_substring": "PF_THREADS must be an integer from 1 to 64",
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 1,
+      "stdout": {
+        "file": "test-pool-invalid-5.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "test-pool-invalid-5.stderr",
+        "bytes": 47,
+        "sha256": "fcbac0d7068430687cb25e84bb530d4e4b4bdee6995304e4c1f3e16e7f70a3f6"
+      },
+      "passed": true
+    },
+    {
+      "name": "test-pool-invalid-6",
+      "argv": [
+        "/tmp/pf-verify-wyj58ma4/pool"
+      ],
+      "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+      "env_overrides": {
+        "PF_THREADS": "999999999999999999999999"
+      },
+      "env_removed": [
+        "PF_SERIAL"
+      ],
+      "timeout_s": 60,
+      "stdin": "empty",
+      "expected_exit": 1,
+      "expected_stderr_substring": "PF_THREADS must be an integer from 1 to 64",
+      "started_utc": "2026-09-12T03:23:02Z",
+      "exit_code": 1,
+      "stdout": {
+        "file": "test-pool-invalid-6.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "file": "test-pool-invalid-6.stderr",
+        "bytes": 47,
+        "sha256": "fcbac0d7068430687cb25e84bb530d4e4b4bdee6995304e4c1f3e16e7f70a3f6"
+      },
+      "passed": true
+    }
+  ],
+  "binaries": {
+    "pf-native": {
+      "sha256": "a812a60b997af0668c1e9eed1e87629fe650d16f2d4387626a48060b0e8fa0e6",
+      "bytes": 95376
+    },
+    "pf-avx2-fma": {
+      "sha256": "524857b130a0649b6d049f7f0f3b0e5c08f91ab1f5bb838dff818ca7a97df6ed",
+      "bytes": 91136
+    },
+    "pf-scalar": {
+      "sha256": "7bf52b96f9160cee1d98ec6475cdd25b9a6da306ec60045af724fa3f2d059c9e",
+      "bytes": 86928
+    },
+    "pf-avx2-no-fma": {
+      "sha256": "00c61121fb7d881f0bd593364ebd22b1861acf8e516488f76eac1d79f98ad3b3",
+      "bytes": 91024
+    },
+    "moe-native": {
+      "sha256": "4e00461f5e2aaa8da7faf73cf157dd8d15b9fe005101b5d945695fa6bcfa0889",
+      "bytes": 99736
+    },
+    "moe-avx2-fma": {
+      "sha256": "0c23f73aab12691c76e6abf20dbd7b681b9745bebfe11204c6852f0c92d85485",
+      "bytes": 99568
+    },
+    "moe-sanitized": {
+      "sha256": "16079cc6686597a638028cc8e18ebc5e11b57b79c0cc8fe210cb9c0a99f1790f",
+      "bytes": 1115640
+    },
+    "projection-native": {
+      "sha256": "ee9e1b42c4ebe02e7006bab049f7c2fd87da820ffa4b9632737c137fadddf623",
+      "bytes": 99520
+    },
+    "projection-sanitized": {
+      "sha256": "3fd240c6fba23e736c25f2e2d206a627d4ea9fc4448ed0b85a7168ad18077d7c",
+      "bytes": 1105280
+    },
+    "pool": {
+      "sha256": "75bb80a98b5486bca025c5d92daf8ecdb37d48ae4dcd761a303b3bbbf94db97e",
+      "bytes": 95456
+    }
+  },
+  "final_pf_sha256": "971913470e097088096e8e1419fb3e03777f61d1163e5d16119df2b323c37f98"
+}
