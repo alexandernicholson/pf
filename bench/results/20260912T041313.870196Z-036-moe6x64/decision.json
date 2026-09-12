@@ -1,0 +1,5 @@
+{
+  "iteration": 36,
+  "status": "rejected",
+  "reason": "Six-token tile had mixed layer results and no reliable win in the irregular15item case; triple remainder selected instead."
+}

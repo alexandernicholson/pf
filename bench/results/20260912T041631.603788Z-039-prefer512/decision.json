@@ -1,0 +1,5 @@
+{
+  "iteration": 39,
+  "status": "rejected",
+  "reason": "Preferring512bit compiler vectors helped some cases but regressed others; no consistent broad benefit."
+}

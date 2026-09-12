@@ -1,0 +1,5 @@
+{
+  "iteration": 38,
+  "status": "rejected",
+  "reason": "32item chunks reduced dispatch count but increased both CPU and wall time in512token screens; default16 retained."
+}

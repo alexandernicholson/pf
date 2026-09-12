@@ -1,0 +1,12 @@
+diff --git a/bench/reviews/session3-attention.md b/bench/reviews/session3-attention.md
+index 3ec253c..830098d 100644
+--- a/bench/reviews/session3-attention.md
++++ b/bench/reviews/session3-attention.md
+@@ -22,6 +22,6 @@ The same pattern repeats across all eight output vectors. Both paths use scalar
+ 
+ The previously saved `/tmp/pf-attention-base.asm` and `/tmp/pf-attention-candidate.asm` are from **production executables**, not those archived benchmark binaries. Their V accumulation uses FMA in both cases. Thus their apparent equivalence did not explain the benchmark mismatch. Build flags for these temporary production executables were not recorded in the assembly files. A compiler option query reports `fp-contract=fast` both with and without `-std=c11`; a dialect-default explanation alone is unsupported. The precise compiler decision responsible for contraction differing between translation units remains unknown.
+ 
+-A source-only diagnostic at `/tmp/pf-s3-attention-rounded.c` uses a register-resident multiply/add loop with function-local contraction disabled, gated by `PF_X86_ATTN_ROUNDED`. It was not compiled, timed, or integrated. Matching the benchmark's separately rounded arithmetic would not establish equivalence to the production executable's fused arithmetic.
++A source-only diagnostic preserved in [session3-attention.patch](session3-attention.patch) against the session-3 baseline uses a register-resident multiply/add loop with function-local contraction disabled, gated by `PF_X86_ATTN_ROUNDED`. It was not compiled, timed, or integrated. Matching the benchmark's separately rounded arithmetic would not establish equivalence to the production executable's fused arithmetic.
+ 
+ Decision: retain the existing attention implementation. Reconsider only with a production-built output comparison and an explicit arithmetic policy; a numerical-policy change also needs model-level validation, which is still unavailable. No production source or benchmark workload was changed for this investigation.

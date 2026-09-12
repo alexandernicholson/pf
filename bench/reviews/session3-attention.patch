@@ -1,0 +1,40 @@
+--- a/pf.c
++++ b/pf.c
+@@ -524,6 +524,27 @@
+ }
+ #endif
+ 
++#if defined(PF_X86_ATTN_ROUNDED) && defined(__AVX2__) && defined(__GNUC__) && !defined(__clang__)
++#define HAVE_X86_ATTN_ROUNDED 1
++/* Experimental arithmetic policy: retain the benchmark baseline's separately
++ * rounded multiply and add. The production compiler may contract the old C
++ * loop, so compare production-built outputs before enabling this by default. */
++static __attribute__((noinline, optimize("fp-contract=off")))
++void attention_v_rounded_x86(const float *sc, float den, const float *v,
++                             int W, float *o) {
++    __m256 acc[HD / 8];
++    for (int i = 0; i < HD / 8; i++) acc[i] = _mm256_setzero_ps();
++    for (int j = 0; j < W; j++, v += KVD) {
++        __m256 weight = _mm256_set1_ps(sc[j] / den);
++        for (int i = 0; i < HD / 8; i++) {
++            __m256 product = _mm256_mul_ps(weight, _mm256_loadu_ps(v + 8 * i));
++            acc[i] = _mm256_add_ps(acc[i], product);
++        }
++    }
++    for (int i = 0; i < HD / 8; i++) _mm256_storeu_ps(o + 8 * i, acc[i]);
++}
++#endif
++
+ /* --------------------------------------------------------------- parallel */
+ static int pf_serial = -1;
+ 
+@@ -1208,6 +1229,9 @@
+             for (int i = 0; i < HD / 4; i++)
+                 vst1q_f32(o + 4 * i, vmulq_f32(acc[i], inv));
+         }
++#elif defined(HAVE_X86_ATTN_ROUNDED)
++        for (int j = 0; j < W; j++) { sc[j] = expf(sc[j] - mx); den += sc[j]; }
++        attention_v_rounded_x86(sc, den, R.v + (size_t)j0 * KVD + g * HD, W, o);
+ #else
+         for (int j = 0; j < W; j++) { sc[j] = expf(sc[j] - mx); den += sc[j]; }
+         for (int i = 0; i < HD; i++) o[i] = 0;

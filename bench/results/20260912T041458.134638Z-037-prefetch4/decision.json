@@ -1,0 +1,5 @@
+{
+  "iteration": 37,
+  "status": "rejected",
+  "reason": "Software prefetch had mixed timings and regressed uneven streaming expert work; no consistent broader benefit."
+}
