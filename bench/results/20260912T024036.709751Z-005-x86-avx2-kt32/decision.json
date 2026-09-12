@@ -1,0 +1,5 @@
+{
+  "iteration": 5,
+  "status": "rejected",
+  "reason": "AVX2 blocked path slower than AVX512 on this CPU; keep AVX2 as portable fallback."
+}

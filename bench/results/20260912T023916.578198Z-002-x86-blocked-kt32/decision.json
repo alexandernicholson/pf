@@ -1,0 +1,5 @@
+{
+  "iteration": 2,
+  "status": "accepted",
+  "reason": "Blocked AVX512 expert kernel materially improves grouped work; continue validation."
+}

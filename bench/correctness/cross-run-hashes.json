@@ -1,0 +1,134 @@
+[
+  {
+    "iteration": 1,
+    "run": "20260912T023842.420521Z-001-upstream-native",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 2,
+    "run": "20260912T023916.578198Z-002-x86-blocked-kt32",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 3,
+    "run": "20260912T023940.378601Z-003-x86-blocked-kt16",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 4,
+    "run": "20260912T024008.569919Z-004-x86-blocked-kt64",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 5,
+    "run": "20260912T024036.709751Z-005-x86-avx2-kt32",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 6,
+    "run": "20260912T024125.686657Z-006-control-repeat",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 7,
+    "run": "20260912T024139.307729Z-007-kt32-extended",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 8,
+    "run": "20260912T024209.770032Z-008-kt16-extended",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 9,
+    "run": "20260912T024312.652753Z-009-threads8-kt16",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 10,
+    "run": "20260912T024356.861766Z-010-threads4-kt16",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 11,
+    "run": "20260912T024412.425191Z-011-threads2-kt16",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 12,
+    "run": "20260912T024432.210211Z-012-attention-registers",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [
+      "phase_b_t32",
+      "phase_b_t256",
+      "phase_b_packed_t256_s32",
+      "layer_t32",
+      "layer_packed_t256_s32"
+    ],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 13,
+    "run": "20260912T024504.053951Z-013-control-threads8",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 14,
+    "run": "20260912T024555.543247Z-014-final-threads8",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 15,
+    "run": "20260912T024710.193519Z-015-threads9",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 16,
+    "run": "20260912T024735.940018Z-016-final-repeat",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 17,
+    "run": "20260912T024838.865216Z-017-control-repeat-threads8",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  },
+  {
+    "iteration": 18,
+    "run": "20260912T025038.223913Z-018-sparse-fast-path",
+    "max_absolute_error_vs_double": 3.59710544462e-07,
+    "hash_mismatches_vs_control": [],
+    "failed_reference_values": 0
+  }
+]

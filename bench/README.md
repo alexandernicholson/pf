@@ -5,6 +5,15 @@ functions in `kernel_bench.c`. No model download is needed. These are synthetic
 kernel and layer measurements, **not model accuracy or end-to-end privacy-filter
 throughput measurements**.
 
+`make check` runs the portable build and correctness checks, saving commands,
+compiler output and test output under `bench/validation/`. The final cloud
+validation passed native, AVX2/FMA, generic scalar and AVX2-without-FMA production
+builds with `-Werror`. Native, AVX2 and AddressSanitizer/UndefinedBehaviorSanitizer
+expert tests each passed 25 cases with zero bitwise mismatches. Pool checks cover
+repeated dispatch and invalid settings. LeakSanitizer scanning is unsupported
+in this container; address/UB instrumentation remains enabled. The earlier
+test-only warning and leak-scanner failures are retained in their original logs.
+
 ```sh
 python3 bench/run.py --label baseline
 python3 bench/run.py --label candidate --note 'Describe the one change under test'
@@ -76,6 +85,30 @@ explicitly not the benchmark's own RSS; use each C sample's `max_rss_kib`.
 Raw observations allow later charts of metrics not selected for the initial
 summary. A failed build, timeout, malformed record, failed reference check, or
 unstable output leaves its evidence directory and returns failure.
+
+`python3 bench/report.py` regenerates the standalone `report.html` chart and
+`metrics.csv.gz` from the raw archive. Select a case and any captured numeric
+metric; runs with different thread/compiler settings remain separate series.
+The chart embeds its data and needs no network connection. The uncompressed
+CSV is a rebuildable local convenience; the compressed CSV retains every row.
+
+## Optional checkpoint validation
+
+When the real checkpoint and tokenizer are available, use:
+
+```sh
+python3 bench/model_bench.py --baseline ./pf-baseline --candidate ./pf \
+  --model ./model --corpus /path/to/test-corpus.jsonl
+```
+
+The corpus must contain JSONL objects with `id` and single-line `text` fields.
+This runner archives its input and raw outputs; use inputs suitable for the
+intended results destination. It checks tokens, masks, spans, logprobs, and
+packed-versus-separate behavior before timing. CLI timing includes startup;
+warmup does not guarantee page-cache residency. It fails explicitly when
+required model files are missing. No model-level run was possible in the
+initial cloud experiment. The initial optional generated text corpus was
+removed; the numeric kernel archive contains no model input documents.
 
 The runner uses `/tmp/pf-cloud-benchmark.lock` to serialize benchmark processes.
 Avoid other CPU-intensive work while timing; an advisory lock cannot prevent

@@ -1,0 +1,28 @@
+{
+  "name": "smoke-avx2-fma",
+  "argv": [
+    "/tmp/pf-verify-9nn0ij_l/pf-avx2-fma"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T02:55:10Z",
+  "exit_code": 0,
+  "stdout": {
+    "file": "smoke-avx2-fma.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "smoke-avx2-fma.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "passed": true
+}

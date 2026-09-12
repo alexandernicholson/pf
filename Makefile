@@ -16,7 +16,19 @@ pf: pf.c unicode_tables.h
 unicode_tables.h: gen_unicode.py
 	python3 gen_unicode.py $@
 
+bench:
+	python3 bench/run.py --label local
+
+bench-cloud:
+	python3 bench/run.py --label cloud --parallel --profile extended
+
+bench-report:
+	python3 bench/report.py
+
+check:
+	python3 bench/verify.py
+
 clean:
 	rm -f pf
 
-.PHONY: clean
+.PHONY: clean check bench bench-cloud bench-report

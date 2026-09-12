@@ -1,0 +1,5 @@
+{
+  "iteration": 8,
+  "status": "rejected",
+  "reason": "KT16 complete-layer timing slightly worse than KT32; no robust gain."
+}

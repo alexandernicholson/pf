@@ -1,0 +1,5 @@
+{
+  "iteration": 3,
+  "status": "rejected",
+  "reason": "KT16 local gains did not translate into a repeatable complete-layer improvement (see008)."
+}

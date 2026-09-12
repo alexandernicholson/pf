@@ -1,0 +1,5 @@
+{
+  "iteration": 15,
+  "status": "rejected",
+  "reason": "Nine workers did not improve full-layer timing over eight and exceed quota."
+}

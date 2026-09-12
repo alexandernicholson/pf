@@ -1,0 +1,5 @@
+{
+  "iteration": 9,
+  "status": "measurement",
+  "reason": "Eight-worker KT16 experiment establishes thread scaling."
+}

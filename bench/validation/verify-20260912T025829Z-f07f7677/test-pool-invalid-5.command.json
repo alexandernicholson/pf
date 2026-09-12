@@ -1,0 +1,30 @@
+{
+  "name": "test-pool-invalid-5",
+  "argv": [
+    "/tmp/pf-verify-zoq5ch4y/pool"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {
+    "PF_THREADS": ""
+  },
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 1,
+  "expected_stderr_substring": "PF_THREADS must be an integer from 1 to 64",
+  "started_utc": "2026-09-12T02:58:38Z",
+  "exit_code": 1,
+  "stdout": {
+    "file": "test-pool-invalid-5.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "test-pool-invalid-5.stderr",
+    "bytes": 47,
+    "sha256": "fcbac0d7068430687cb25e84bb530d4e4b4bdee6995304e4c1f3e16e7f70a3f6"
+  },
+  "passed": true
+}

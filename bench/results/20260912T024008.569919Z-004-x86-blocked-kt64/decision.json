@@ -1,0 +1,5 @@
+{
+  "iteration": 4,
+  "status": "rejected",
+  "reason": "KT64 loses streaming-weight performance despite a small cached-kernel gain."
+}

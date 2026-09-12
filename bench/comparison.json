@@ -1,0 +1,305 @@
+{
+  "scope": "Synthetic production kernels and one layer; no full model validation. Same8workers; pooled18 timed samples from2runs per variant.",
+  "final_source_sha256": "c4466e70fc32b2814d360d9151d119cbfef4c9c0901c0ce375624cf69152dba8",
+  "comparisons": {
+    "moe_e1_m1": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 0.1202697177915,
+        "min_ms": 0.10760398427,
+        "max_ms": 0.148582444944
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 0.13969746123050003,
+        "min_ms": 0.125702559524,
+        "max_ms": 0.20137744578300001
+      },
+      "speedup": 0.860929874688672
+    },
+    "moe_e1_m4": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 0.44983797476899995,
+        "min_ms": 0.435524048,
+        "max_ms": 0.47972359230800005
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 0.21646378627450003,
+        "min_ms": 0.20233758571399998,
+        "max_ms": 0.260077189286
+      },
+      "speedup": 2.0781211606386467
+    },
+    "moe_e1_m16": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 1.9901092361110002,
+        "min_ms": 1.6916673055559999,
+        "max_ms": 2.584160676471
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 0.662370162791,
+        "min_ms": 0.628447406977,
+        "max_ms": 0.797082819149
+      },
+      "speedup": 3.004527298943184
+    },
+    "moe_e32_m1": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 2.0079639229525004,
+        "min_ms": 1.78661178125,
+        "max_ms": 2.517781068966
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 2.2177076875,
+        "min_ms": 1.812560241379,
+        "max_ms": 2.662777172414
+      },
+      "speedup": 0.9054231692798335
+    },
+    "moe_e128_m1": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 7.8852359375,
+        "min_ms": 7.1564055,
+        "max_ms": 9.343442099999999
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 7.883311888889,
+        "min_ms": 6.5513275,
+        "max_ms": 9.705544
+      },
+      "speedup": 1.0002440660268321
+    },
+    "moe_e32_m4": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 5.911179,
+        "min_ms": 5.035486111111,
+        "max_ms": 7.198846111111
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 3.7366065,
+        "min_ms": 2.704062666667,
+        "max_ms": 4.6845492
+      },
+      "speedup": 1.5819645445673767
+    },
+    "projection_qkv": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 0.0850810770145,
+        "min_ms": 0.08224135725699999,
+        "max_ms": 0.108652587678
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 0.0873161829405,
+        "min_ms": 0.082570095372,
+        "max_ms": 0.16892131837299998
+      },
+      "speedup": 0.9744021571863366
+    },
+    "projection_out": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 0.064291296732,
+        "min_ms": 0.06211515024,
+        "max_ms": 0.068828919471
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 0.065339748985,
+        "min_ms": 0.062899044655,
+        "max_ms": 0.081661351827
+      },
+      "speedup": 0.983953837146808
+    },
+    "phase_b_t32": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 0.6850222307694999,
+        "min_ms": 0.501880593407,
+        "max_ms": 1.049583065934
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 0.6588429651029999,
+        "min_ms": 0.50996098913,
+        "max_ms": 1.099181391304
+      },
+      "speedup": 1.039735213173912
+    },
+    "phase_b_t256": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 5.8258821818185,
+        "min_ms": 5.047349090909,
+        "max_ms": 6.914830909091
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 6.16555325,
+        "min_ms": 5.0308443333329995,
+        "max_ms": 7.960641125
+      },
+      "speedup": 0.9449082581224157
+    },
+    "phase_b_packed_t256_s32": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 3.9448734199345,
+        "min_ms": 3.324649611111,
+        "max_ms": 5.087102294118
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 4.124385619281,
+        "min_ms": 3.306117777778,
+        "max_ms": 6.512401117646999
+      },
+      "speedup": 0.9564754084808893
+    },
+    "layer_t32": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 9.446116869048,
+        "min_ms": 7.717880571429,
+        "max_ms": 11.0216185
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 7.5356080833335,
+        "min_ms": 6.871530666667001,
+        "max_ms": 10.046302166667
+      },
+      "speedup": 1.2535308052896184
+    },
+    "layer_packed_t256_s32": {
+      "control": {
+        "runs": [
+          "20260912T024504.053951Z-013-control-threads8",
+          "20260912T024838.865216Z-017-control-repeat-threads8"
+        ],
+        "samples": 18,
+        "median_ms": 41.048985,
+        "min_ms": 31.6786945,
+        "max_ms": 47.8203835
+      },
+      "candidate": {
+        "runs": [
+          "20260912T024555.543247Z-014-final-threads8",
+          "20260912T024735.940018Z-016-final-repeat"
+        ],
+        "samples": 18,
+        "median_ms": 26.1346705,
+        "min_ms": 20.200577666666998,
+        "max_ms": 30.757158333333
+      },
+      "speedup": 1.5706716103422846
+    }
+  }
+}

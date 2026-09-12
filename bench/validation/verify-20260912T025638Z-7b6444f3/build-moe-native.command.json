@@ -1,0 +1,38 @@
+{
+  "name": "build-moe-native",
+  "argv": [
+    "cc",
+    "-O3",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-pthread",
+    "-march=native",
+    "-o",
+    "/tmp/pf-verify-qd3j709c/moe-native",
+    "bench/test_x86_moe.c",
+    "-lm"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T02:56:38Z",
+  "exit_code": 0,
+  "stdout": {
+    "file": "build-moe-native.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "build-moe-native.stderr",
+    "bytes": 2391,
+    "sha256": "14cad77ce8d2237e782242578b65bce0e2402b074afcf3472f0dda484e5577fc"
+  },
+  "passed": true
+}

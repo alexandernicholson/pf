@@ -1,0 +1,5 @@
+{
+  "iteration": 12,
+  "status": "rejected",
+  "reason": "Attention-only isolated bitwise tests passed but complete-phase output hashes changed; overall timing improvement inconsistent. Removed from production."
+}

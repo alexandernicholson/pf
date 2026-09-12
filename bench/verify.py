@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""Cloud x86 build and correctness gates. No throughput or latency measurements."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import shlex
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def save(path, value):
+    with path.open("w") as f:
+        json.dump(value, f, indent=2)
+        f.write("\n")
+        f.flush()
+        os.fsync(f.fileno())
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--cc", default=os.environ.get("CC", "cc"))
+    ap.add_argument("--results", type=Path, default=ROOT / "bench/validation")
+    ap.add_argument("--expect-source-sha")
+    ap.add_argument("--reuse-production", type=Path, help="reuse passed production gates from a matching-source summary.json")
+    ap.add_argument("--reuse-correctness", type=Path, help="reuse passed native/AVX2 correctness gates from summary.json")
+    ap.add_argument("--timeout", type=int, default=60)
+    args = ap.parse_args()
+    if args.timeout <= 0:
+        ap.error("timeout must be positive")
+    out = args.results.resolve() / (time.strftime("verify-%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + uuid.uuid4().hex[:8])
+    out.mkdir(parents=True, exist_ok=False)
+    sources = ["pf.c", "unicode_tables.h", "bench/test_x86_moe.c", "bench/test_pool.c", "bench/verify.py"]
+    summary = {"schema": 1, "status": "running", "scope": "compilation and correctness only; no model inference or performance measurements",
+               "invocation": sys.argv, "platform": platform.platform(), "python": sys.version,
+               "source_sha256": {p: digest(ROOT / p) for p in sources}, "expected_pf_sha256": args.expect_source_sha,
+               "reused_production_summary": str(args.reuse_production.resolve()) if args.reuse_production else None,
+               "reused_correctness_summary": str(args.reuse_correctness.resolve()) if args.reuse_correctness else None,
+               "sanitizer_scope": "ASan and UBSan; leak scanning disabled because this environment denies /proc task access",
+               "commands": [], "binaries": {}}
+    save(out / "summary.json", summary)
+
+    def run(name, command, env=None, expected=0, diagnostic=None):
+        env = env or {}
+        record = {"name": name, "argv": list(map(str, command)), "cwd": str(ROOT),
+                  "env_overrides": env, "env_removed": ["PF_SERIAL"], "timeout_s": args.timeout,
+                  "stdin": "empty", "expected_exit": expected, "expected_stderr_substring": diagnostic,
+                  "started_utc": time.strftime("%FT%TZ", time.gmtime())}
+        save(out / (name + ".command.json"), record)
+        child_env = {k: v for k, v in os.environ.items() if k != "PF_SERIAL"}
+        child_env.update(env)
+        with (out / (name + ".stdout")).open("wb") as stdout, (out / (name + ".stderr")).open("wb") as stderr:
+            try:
+                p = subprocess.Popen(record["argv"], cwd=ROOT, env=child_env, stdin=subprocess.DEVNULL,
+                                     stdout=stdout, stderr=stderr, start_new_session=True)
+                try:
+                    record["exit_code"] = p.wait(timeout=args.timeout)
+                except subprocess.TimeoutExpired:
+                    record["timed_out"] = True
+                    os.killpg(p.pid, signal.SIGKILL)
+                    record["exit_code"] = p.wait()
+            except OSError as exc:
+                record.update(exit_code=None, error=str(exc))
+        for stream in ("stdout", "stderr"):
+            path = out / (name + "." + stream)
+            record[stream] = {"file": path.name, "bytes": path.stat().st_size, "sha256": digest(path)}
+        record["passed"] = record.get("exit_code") == expected and not record.get("timed_out")
+        if diagnostic:
+            record["passed"] &= diagnostic in (out / (name + ".stderr")).read_text()
+        save(out / (name + ".command.json"), record)
+        with (out / "commands.jsonl").open("a") as f:
+            f.write(json.dumps(record) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        summary["commands"].append(record)
+        save(out / "summary.json", summary)
+        if not record["passed"]:
+            raise RuntimeError(f"{name} failed: exit={record.get('exit_code')}, timeout={record.get('timed_out', False)}")
+
+    try:
+        if args.expect_source_sha and summary["source_sha256"]["pf.c"] != args.expect_source_sha:
+            raise RuntimeError("pf.c does not match the expected final source hash")
+        if platform.machine() not in ("x86_64", "amd64"):
+            raise RuntimeError("This verification matrix targets x86-64")
+        cc = shlex.split(args.cc)
+        run("compiler-version", [*cc, "--version"])
+        common = ["-std=c11", "-Wall", "-Wextra", "-pthread"]
+        targets = {"native": ["-march=native"], "avx2-fma": ["-march=x86-64", "-mavx2", "-mfma"],
+                   "scalar": ["-march=x86-64", "-mno-avx", "-mno-avx2", "-mno-fma"],
+                   "avx2-no-fma": ["-march=x86-64", "-mavx2", "-mno-fma"]}
+        if args.reuse_production:
+            prior = json.loads(args.reuse_production.read_text())
+            needed = {prefix + target for target in targets for prefix in ("build-pf-", "smoke-")}
+            passed = {c["name"] for c in prior["commands"] if c["passed"]}
+            same_source = all(prior["source_sha256"][s] == summary["source_sha256"][s] for s in ("pf.c", "unicode_tables.h"))
+            same_compiler = digest(args.reuse_production.parent / "compiler-version.stdout") == digest(out / "compiler-version.stdout")
+            if not needed <= passed or not same_source or not same_compiler:
+                raise RuntimeError("Prior production gates are incomplete or source/compiler differs")
+            summary["reused_production_sha256"] = digest(args.reuse_production)
+            summary["reused_production_commands"] = [c for c in prior["commands"] if c["name"] in needed]
+        checked = set()
+        if args.reuse_correctness:
+            prior = json.loads(args.reuse_correctness.read_text())
+            same_source = all(prior["source_sha256"][s] == summary["source_sha256"][s] for s in sources if s != "bench/verify.py")
+            same_compiler = digest(args.reuse_correctness.parent / "compiler-version.stdout") == digest(out / "compiler-version.stdout")
+            if not same_source or not same_compiler:
+                raise RuntimeError("Prior correctness source/compiler differs")
+            checked = {c["name"] for c in prior["commands"] if c["passed"] and c["name"] in ("test-moe-native", "test-moe-avx2-fma")}
+            summary["reused_correctness_sha256"] = digest(args.reuse_correctness)
+            summary["reused_correctness_commands"] = [c for c in prior["commands"] if c["name"] in checked]
+        with tempfile.TemporaryDirectory(prefix="pf-verify-") as tmp:
+            def build(name, source, flags, optimization="-O3"):
+                exe = Path(tmp) / name
+                strict = ["-Werror"] if source == "pf.c" else []
+                run("build-" + name, [*cc, optimization, *common, *strict, *flags, "-o", exe, source, "-lm"])
+                summary["binaries"][name] = {"sha256": digest(exe), "bytes": exe.stat().st_size}
+                return exe
+            for target, flags in targets.items():
+                if args.reuse_production:
+                    continue
+                exe = build("pf-" + target, "pf.c", flags)
+                run("smoke-" + target, [exe])
+            for target in ("native", "avx2-fma"):
+                if "test-moe-" + target in checked:
+                    continue
+                exe = build("moe-" + target, "bench/test_x86_moe.c", targets[target])
+                run("test-moe-" + target, [exe])
+            flags = targets["native"] + ["-g", "-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
+            exe = build("moe-sanitized", "bench/test_x86_moe.c", flags, "-O1")
+            run("test-moe-sanitized", [exe], {"ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+                                             "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"})
+            exe = build("pool", "bench/test_pool.c", targets["native"])
+            for threads in (1, 2, 4, 8):
+                run(f"test-pool-{threads}", [exe], {"PF_THREADS": str(threads)})
+            for i, value in enumerate(("0", "-1", "65", "abc", "1x", "", "999999999999999999999999")):
+                run(f"test-pool-invalid-{i}", [exe], {"PF_THREADS": value}, 1,
+                    "PF_THREADS must be an integer from 1 to 64")
+        summary["final_pf_sha256"] = digest(ROOT / "pf.c")
+        if summary["final_pf_sha256"] != summary["source_sha256"]["pf.c"]:
+            raise RuntimeError("pf.c changed during verification")
+        summary["status"] = "passed"
+    except (OSError, RuntimeError) as exc:
+        summary.update(status="failed", error=str(exc))
+    save(out / "summary.json", summary)
+    print(json.dumps({"status": summary["status"], "result_dir": str(out), "commands": len(summary["commands"]),
+                      "error": summary.get("error")}))
+    return 0 if summary["status"] == "passed" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

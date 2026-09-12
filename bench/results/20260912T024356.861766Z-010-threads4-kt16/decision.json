@@ -1,0 +1,5 @@
+{
+  "iteration": 10,
+  "status": "rejected",
+  "reason": "Four workers reduce throughput relative to eight."
+}

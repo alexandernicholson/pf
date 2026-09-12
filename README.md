@@ -2,7 +2,8 @@
 
 OpenAI's [privacy-filter](https://github.com/openai/privacy-filter) PII masking
 model (1.5B-param MoE, 50M active) reimplemented as one C file, tuned for Apple
-Silicon. No dependencies beyond libm; weights are mmap'd bf16 straight out of
+Silicon and Linux x86-64. No dependencies beyond libm and system threading;
+weights are mmap'd bf16 straight out of
 `model.safetensors`.
 
 ```
@@ -61,7 +62,7 @@ streams, and therefore outputs, matched the reference on every input tested.
 ## Setup
 
 ```sh
-make                       # clang -O3 -mcpu=native; needs Apple Silicon for the fast path
+make                       # native ARM or x86 SIMD; pthreads on Linux
 mkdir -p model && cd model
 curl -LO https://huggingface.co/openai/privacy-filter/resolve/main/original/config.json
 curl -LO https://huggingface.co/openai/privacy-filter/resolve/main/original/model.safetensors
@@ -136,6 +137,35 @@ All three produce byte-identical output (the AVX2 and scalar builds are
 verified under Rosetta 2). Threading uses libdispatch on macOS and a built-in
 pthread pool elsewhere; no other dependencies. Linux build:
 `cc -O3 -std=c11 -march=native -pthread -o pf pf.c -lm`
+
+### Linux cloud optimization and measurement
+
+The x86 expert path now reuses BF16 weights across four tokens with AVX2/FMA or
+AVX-512 (when compiled for a supporting CPU). It preserves FP32 activations and
+the original increasing-k FMA order. Sparse single-token experts retain the
+original matrix-vector kernel. The existing ARM kernels are unchanged.
+
+The pthread pool defaults to the usable CPU count, bounded by affinity and the
+cgroup-v2 quota at `/sys/fs/cgroup/cpu.max` when available. Nested ancestor or
+cgroup-v1 quotas are not inferred. Set `PF_THREADS=1..64` to override it;
+`PF_SERIAL=1` bypasses the pool. `make ARCHFLAGS=` builds for the compiler's
+generic target; native builds should be rebuilt when moved to another CPU.
+
+```sh
+make
+make bench                 # quick, deterministic synthetic kernel suite
+make bench-cloud           # production pthread path + synthetic layer cases
+make bench-report          # rebuild offline chart and metric export
+```
+
+The [experiment log](bench/ITERATIONS.md), [raw results](bench/results),
+[offline chart](bench/report.html), and [harness documentation](bench/README.md)
+record the cloud hillclimb, including rejected attempts. Every run preserves
+raw repetitions, numerical checks, sources, build flags, hardware and resource
+counters. The initial cloud runs use synthetic weights: full-checkpoint
+accuracy and end-to-end throughput remain unverified because model downloads
+were unavailable. Historical model-output claims above describe the original
+tested builds, not a new cloud checkpoint validation.
 
 ## Approximate mode
 

@@ -1,0 +1,5 @@
+{
+  "iteration": 18,
+  "status": "rejected",
+  "reason": "Direct singleton dispatch adds complexity without consistent measured gain; short-layer timing regressed in this trial. Restored exact source from014/016."
+}

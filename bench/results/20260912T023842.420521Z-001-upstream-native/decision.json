@@ -1,0 +1,5 @@
+{
+  "iteration": 1,
+  "status": "baseline",
+  "reason": "Upstream x86 algorithm. Original GNU feature-macro build repair only."
+}

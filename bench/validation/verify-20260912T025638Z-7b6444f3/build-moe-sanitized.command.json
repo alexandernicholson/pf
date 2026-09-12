@@ -1,0 +1,41 @@
+{
+  "name": "build-moe-sanitized",
+  "argv": [
+    "cc",
+    "-O1",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-pthread",
+    "-march=native",
+    "-g",
+    "-fsanitize=address,undefined",
+    "-fno-omit-frame-pointer",
+    "-o",
+    "/tmp/pf-verify-qd3j709c/moe-sanitized",
+    "bench/test_x86_moe.c",
+    "-lm"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T02:56:45Z",
+  "exit_code": 0,
+  "stdout": {
+    "file": "build-moe-sanitized.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "build-moe-sanitized.stderr",
+    "bytes": 1229,
+    "sha256": "5efc16e749f885acb7fc065f84a5ed267d0fcf45a0a615446033f8be81913b69"
+  },
+  "passed": true
+}

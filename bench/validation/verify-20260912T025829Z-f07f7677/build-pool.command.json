@@ -1,0 +1,38 @@
+{
+  "name": "build-pool",
+  "argv": [
+    "cc",
+    "-O3",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-pthread",
+    "-march=native",
+    "-o",
+    "/tmp/pf-verify-zoq5ch4y/pool",
+    "bench/test_pool.c",
+    "-lm"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T02:58:35Z",
+  "exit_code": 0,
+  "stdout": {
+    "file": "build-pool.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "build-pool.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "passed": true
+}
