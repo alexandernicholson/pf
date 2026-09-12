@@ -1,0 +1,53 @@
+diff --git a/bench/reviews/session3-attention.md b/bench/reviews/session3-attention.md
+index 3ec253c..830098d 100644
+--- a/bench/reviews/session3-attention.md
++++ b/bench/reviews/session3-attention.md
+@@ -22,6 +22,6 @@ The same pattern repeats across all eight output vectors. Both paths use scalar
+ 
+ The previously saved `/tmp/pf-attention-base.asm` and `/tmp/pf-attention-candidate.asm` are from **production executables**, not those archived benchmark binaries. Their V accumulation uses FMA in both cases. Thus their apparent equivalence did not explain the benchmark mismatch. Build flags for these temporary production executables were not recorded in the assembly files. A compiler option query reports `fp-contract=fast` both with and without `-std=c11`; a dialect-default explanation alone is unsupported. The precise compiler decision responsible for contraction differing between translation units remains unknown.
+ 
+-A source-only diagnostic at `/tmp/pf-s3-attention-rounded.c` uses a register-resident multiply/add loop with function-local contraction disabled, gated by `PF_X86_ATTN_ROUNDED`. It was not compiled, timed, or integrated. Matching the benchmark's separately rounded arithmetic would not establish equivalence to the production executable's fused arithmetic.
++A source-only diagnostic preserved in [session3-attention.patch](session3-attention.patch) against the session-3 baseline uses a register-resident multiply/add loop with function-local contraction disabled, gated by `PF_X86_ATTN_ROUNDED`. It was not compiled, timed, or integrated. Matching the benchmark's separately rounded arithmetic would not establish equivalence to the production executable's fused arithmetic.
+ 
+ Decision: retain the existing attention implementation. Reconsider only with a production-built output comparison and an explicit arithmetic policy; a numerical-policy change also needs model-level validation, which is still unavailable. No production source or benchmark workload was changed for this investigation.
+diff --git a/pf.c b/pf.c
+index ef14634..40f7ea6 100644
+--- a/pf.c
++++ b/pf.c
+@@ -456,6 +456,36 @@ static void moe_gemm_x86(const bf16 *w, const float *const *xs, float *const *ys
+                     moe_store(ys[i+3] + j + v * MOE_V, a3[v]);
+                 }
+             }
++#if !defined(PF_NO_MOE_TRIPLE) && (MOE_V == 16 || defined(PF_MOE_TRIPLE))
++            /* Three leftover tokens share weight loads and BF16 conversion.
++             * Each output keeps the original increasing-k FMA sequence. */
++            if (i + 3 <= B) {
++                moe_vec a0[MOE_NV], a1[MOE_NV], a2[MOE_NV];
++                for (int v = 0; v < MOE_NV; v++) {
++                    a0[v] = moe_load(ys[i] + j + v * MOE_V);
++                    a1[v] = moe_load(ys[i+1] + j + v * MOE_V);
++                    a2[v] = moe_load(ys[i+2] + j + v * MOE_V);
++                }
++                for (int k = kt; k < kend; k++) {
++                    moe_vec x0 = moe_bcast(xs[i][k]);
++                    moe_vec x1 = moe_bcast(xs[i+1][k]);
++                    moe_vec x2 = moe_bcast(xs[i+2][k]);
++                    const bf16 *wk = w + (size_t)k * n_out + j;
++                    for (int v = 0; v < MOE_NV; v++) {
++                        moe_vec wv = moe_weight(wk + v * MOE_V);
++                        a0[v] = moe_fma(x0, wv, a0[v]);
++                        a1[v] = moe_fma(x1, wv, a1[v]);
++                        a2[v] = moe_fma(x2, wv, a2[v]);
++                    }
++                }
++                for (int v = 0; v < MOE_NV; v++) {
++                    moe_store(ys[i] + j + v * MOE_V, a0[v]);
++                    moe_store(ys[i+1] + j + v * MOE_V, a1[v]);
++                    moe_store(ys[i+2] + j + v * MOE_V, a2[v]);
++                }
++                i += 3;
++            }
++#endif
+             for (; i < B; i++) {
+                 moe_vec a[MOE_NV];
+                 for (int v = 0; v < MOE_NV; v++)

@@ -1,5 +1,5 @@
 {
   "iteration": 35,
-  "status": "inconclusive",
-  "reason": "Eight-token by32output tile provides no clear broader layer win in first screening run."
+  "status": "rejected",
+  "reason": "8x32 tile did not establish a broader layer win; targeted triple remainder is simpler and shows repeatable irregular-batch gains."
 }

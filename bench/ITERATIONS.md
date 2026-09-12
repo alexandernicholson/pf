@@ -110,7 +110,7 @@ to refresh the offline chart. For a control, use:
 
 ```sh
 PF_THREADS=8 python3 bench/run.py --label control --parallel --profile extended \
-  --cflags '-D_GNU_SOURCE -O3 -std=c11 -march=native -DPF_NO_X86_MOE -DPF_NO_PROJ4 -DPF_NO_WIDE_AXPY'
+  --cflags '-D_GNU_SOURCE -O3 -std=c11 -march=native -DPF_NO_X86_MOE -DPF_NO_PROJ4 -DPF_NO_WIDE_AXPY -DPF_NO_MOE_TRIPLE'
 ```
 
 Change one factor, record a new uniquely labeled run, compare outputs and timing,
@@ -166,3 +166,68 @@ Selected source SHA256: `971913470e097088096e8e1419fb3e03777f61d1163e5d16119df2b
 Session-2 validation: all 31 build, smoke, bitwise correctness, sanitizer and pool commands passed in `validation/verify-20260912T032225Z-63f1b94d/`. Native and sanitized projection checks each compared 5,404 outputs with zero bitwise mismatches.
 
 Final review fixed projection-test skip handling on x86 hosts without AVX-512. A focused regression using the real AVX2 and native binaries passed six assertions, including rejection of malformed or unauthorized skips; see `validation/projection-skip-20260912T040329Z/`. Review also independently reproduced every wall and CPU median in `comparison-session2.json`.
+
+## Session 3: broader workloads and a targeted remainder kernel
+
+Runs 032–045 explore caller participation, larger register tiles, software prefetch, larger expert chunks, compiler vector-width preference and a three-token remainder. The attention investigation is preserved in `reviews/session3-attention.md` and its unmeasured diagnostic patch. Raw evidence was checkpointed during the session; rejected code remains in each measured run snapshot.
+
+The new `diverse` profile appends nine cases to the original 13: expert batches of 3/7/15, uneven streaming occupancy, layers of 1/8 tokens, packed 512 tokens and full 512-token attention/layers. Original hashes are unchanged. New routing records contain every expert occupancy and chunk distribution, outside timed intervals. This remains synthetic, single-layer evidence with no trained-router or full-checkpoint validation.
+
+| Run | Decision | Packed 256 layer ms | Reason |
+| --- | --- | ---: | --- |
+| [032](results/20260912T040946.531681Z-032-session3-baseline) | control | 21.236 | Fresh session-3 current-source control. |
+| [033](results/20260912T041029.014841Z-033-caller-pool) | rejected | 24.492 | Caller participation did not improve the extended suite; consider separately on new short-input cases. |
+| [034](results/20260912T041118.376258Z-034-diverse-control) | control | 22.666 | Broader 22-case suite; all original 13 hashes preserved. |
+| [035](results/20260912T041233.497231Z-035-moe8x32) | rejected | 22.035 | 8x32 tile did not establish a broader layer win; targeted triple remainder is simpler and shows repeatable irregular-batch gains. |
+| [036](results/20260912T041313.870196Z-036-moe6x64) | rejected | 19.897 | Six-token tile had mixed layer results and no reliable win in the irregular 15-item case; triple remainder selected instead. |
+| [037](results/20260912T041458.134638Z-037-prefetch4) | rejected | 21.680 | Software prefetch had mixed timings and regressed uneven streaming expert work; no consistent broader benefit. |
+| [038](results/20260912T041540.822203Z-038-chunks32) | rejected | 22.500 | 32-item chunks reduced dispatch count but increased both CPU and wall time in 512-token screens; default 16 retained. |
+| [039](results/20260912T041631.603788Z-039-prefer512) | rejected | 24.261 | Preferring512bit compiler vectors helped some cases but regressed others; no consistent broad benefit. |
+| [040](results/20260912T041737.772133Z-040-triple-tail) | accepted | 20.750 | Three-token remainder screening candidate; exact outputs retained and gain confirmed by final repeats 043/044. |
+| [041](results/20260912T041850.448867Z-041-caller-diverse) | rejected | 20.896 | Caller participation repeat on diverse profile did not establish a short-input or broader-layer win. |
+| [042](results/20260912T041925.797943Z-042-final-control) | control | 17.764 | Previous delivered source, current diverse harness; forward control. |
+| [043](results/20260912T042022.508141Z-043-final-triple) | accepted | 20.452 | Final default-on AVX512 triple remainder; all 22 hashes match. |
+| [044](results/20260912T042102.400443Z-044-final-triple-repeat) | accepted | 18.277 | Independent repeat of final source. |
+| [045](results/20260912T042159.251248Z-045-final-control-repeat) | control | 24.663 | Previous source repeated after candidates; scheduling drift is visible on unchanged paths. |
+
+The retained change shares BF16 weight loads/conversion across three remaining tokens after four-token blocks. It preserves each output’s increasing-k FMA order and activates by default only for the existing AVX512 expert path. `PF_NO_MOE_TRIPLE` disables it; `PF_MOE_TRIPLE` explicitly enables AVX2 experimentation. No caller-pool, larger tile, prefetch, larger chunk or compiler preference change was retained.
+
+Final source SHA256: `5f870a795b83e632aa74a39a1d019865707558848dbc00eec639ee8d9e2f10e1`. All measured session-3 cases match their baseline hashes, with no failed reference values or unstable samples (`cross-run-checks-session3.json`).
+
+### Repeated comparison
+
+Controls 042/045 and candidates 043/044 each contribute 18 raw repetitions per case, in control/candidate/candidate/control order. Reproduce these calculations with:
+
+```sh
+python3 bench/compare.py --control 042 045 --candidate 043 044 \
+  --output bench/comparison-session3.json
+```
+
+| Workload | Control wall ms | Candidate wall ms | Wall speedup | CPU speedup |
+| --- | ---: | ---: | ---: | ---: |
+| moe_e1_m1 | 0.120 | 0.117 | 1.02× | 1.02× |
+| moe_e1_m4 | 0.221 | 0.210 | 1.06× | 1.06× |
+| moe_e1_m16 | 0.695 | 0.659 | 1.05× | 1.05× |
+| moe_e32_m1 | 2.190 | 2.016 | 1.09× | 1.09× |
+| moe_e128_m1 | 7.554 | 7.422 | 1.02× | 1.02× |
+| moe_e32_m4 | 3.879 | 3.749 | 1.03× | 0.97× |
+| projection_qkv | 0.068 | 0.065 | 1.05× | 1.05× |
+| projection_out | 0.039 | 0.046 | 0.86× | 0.86× |
+| phase_b_t32 | 0.570 | 0.491 | 1.16× | 1.03× |
+| phase_b_t256 | 5.269 | 4.883 | 1.08× | 1.05× |
+| phase_b_packed_t256_s32 | 3.032 | 3.110 | 0.98× | 0.98× |
+| layer_t32 | 8.933 | 6.871 | 1.30× | 1.22× |
+| layer_packed_t256_s32 | 21.777 | 19.855 | 1.10× | 1.10× |
+| moe_e1_m3 | 0.265 | 0.174 | 1.52× | 1.52× |
+| moe_e1_m7 | 0.440 | 0.312 | 1.41× | 1.41× |
+| moe_e1_m15 | 0.715 | 0.594 | 1.20× | 1.20× |
+| moe_e32_uneven_m1_31 | 6.851 | 6.615 | 1.04× | 1.05× |
+| layer_t1 | 0.627 | 0.479 | 1.31× | 1.21× |
+| layer_t8 | 2.935 | 2.249 | 1.31× | 1.17× |
+| layer_packed_t512_s64 | 41.026 | 34.573 | 1.19× | 1.18× |
+| phase_b_t512 | 11.124 | 10.357 | 1.07× | 1.07× |
+| layer_t512 | 41.621 | 37.392 | 1.11× | 1.11× |
+
+The defensible gain is the targeted irregular expert kernel: 3/7/15 assignments improve by 1.52×/1.41×/1.20× in pooled medians, and both candidate runs beat both control medians in those cases. Broader pooled layer medians look better, but cannot cleanly separate the change from host/scheduling drift: the one-token layer does not exercise the triple path yet moves substantially, and unchanged output projection regresses in the pooled comparison. No reliable overall-layer speedup is claimed for this round. All outliers and regressions remain included; no samples were discarded. CPU time is aggregate process CPU divided by each repetition’s invocation count, not elapsed wall time or unnormalized batch CPU.
+
+Final validation passed all 31 build, smoke, correctness, sanitizer and pool commands in `validation/verify-20260912T042312Z-48c0abd4/`. Native/AVX2/sanitized expert tests each passed 30 cases, including three-token remainders after multiple full blocks and a partial reduction tile. Native and sanitized projection tests each passed 5,404 exact comparisons.

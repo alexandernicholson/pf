@@ -9,7 +9,7 @@ throughput measurements**.
 compiler output and test output under `bench/validation/`. The final cloud
 validation passed native, AVX2/FMA, generic scalar and AVX2-without-FMA production
 builds with `-Werror`. Native, AVX2 and AddressSanitizer/UndefinedBehaviorSanitizer
-expert tests each passed 25 cases with zero bitwise mismatches. Native and sanitized projection checks cover row/input tails, bias, residual
+expert tests each passed 30 cases with zero bitwise mismatches. Native and sanitized projection checks cover row/input tails, bias, residual
 addition and output guards with bitwise scalar-reference comparisons. On x86
 hosts without AVX-512, these checks record an explicit unavailable-kernel skip;
 other errors still fail validation. Pool checks cover
@@ -22,6 +22,7 @@ python3 bench/run.py --label baseline
 python3 bench/run.py --label candidate --note 'Describe the one change under test'
 python3 bench/run.py --label parallel --parallel --profile extended
 PF_THREADS=4 python3 bench/run.py --label threads-4 --parallel --profile extended
+python3 bench/run.py --label diverse --parallel --profile diverse
 python3 bench/run.py --label upstream --source /path/to/upstream-pf.c
 ```
 
@@ -48,6 +49,12 @@ matching `forward`. All 128 experts are independently populated, including the
 300 MiB of BF16 expert matrices. This is one layer's working set, not the full
 eight-layer model. The synthetic weights are reproducible uniform BF16 values;
 the router distribution is not claimed to match trained model behavior.
+
+`--profile diverse` appends expert batches of 3/7/15 assignments, 32 experts
+with uneven 1–31 item occupancy, 1/8-token layers, a packed 512-token layer
+(segment 64), and unsegmented 512-token phase-B/layer cases. It retains all
+13 extended cases in the original order. New `routing` records preserve every
+expert occupancy plus chunk counts and sizes outside timing.
 
 Each case performs a correctness run, two calibration calls, then five raw timed
 repetitions. Calibration targets 25 ms per repetition, with at least one whole
@@ -94,6 +101,16 @@ unstable output leaves its evidence directory and returns failure.
 metric; runs with different thread/compiler settings remain separate series.
 The chart embeds its data and needs no network connection. The uncompressed
 CSV is a rebuildable local convenience; the compressed CSV retains every row.
+
+Pool raw repetitions reproducibly with:
+
+```sh
+python3 bench/compare.py --control 042 045 --candidate 043 044 \
+  --output bench/comparison-session3.json
+```
+The command checks complete passed archives, matching harnesses and case sets,
+and exact output hashes. CPU comparisons use `process_cpu_ns / loops`.
+It retains every sample; pooled medians are not confidence intervals.
 
 ## Optional checkpoint validation
 

@@ -1,0 +1,5 @@
+{
+  "iteration": 45,
+  "status": "control",
+  "reason": "Previous source repeated after candidates; scheduling drift is visible on unchanged paths."
+}

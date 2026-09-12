@@ -132,9 +132,17 @@ int main(void) {
             }
         }
     }
-    /* 40 input rows also checks a partial reduction tile for KT=16/32/64. */
-    failed += test_shape(7, 40, 640, 1);
-    cases++;
+    /* Three-token remainders after one, two, and three complete token
+     * blocks, with partial reduction tiles for KT=16/32/64. These small
+     * shapes cover both model output widths without repeating costly full
+     * 640-row reductions already exercised above. */
+    int tail_batches[] = {7, 11, 15};
+    for (int shape = 0; shape < 2; shape++) {
+        for (size_t b = 0; b < sizeof tail_batches / sizeof *tail_batches; b++) {
+            failed += test_shape(tail_batches[b], 40, shape ? 1280 : 640, 1);
+            cases++;
+        }
+    }
     printf("{\"record\":\"summary\",\"cases\":%d,\"failed_cases\":%d,"
            "\"status\":\"%s\"}\n", cases, failed, failed ? "fail" : "pass");
     return failed ? 1 : 0;

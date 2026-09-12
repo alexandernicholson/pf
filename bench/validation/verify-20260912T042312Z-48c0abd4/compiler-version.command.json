@@ -1,0 +1,31 @@
+{
+  "name": "compiler-version",
+  "argv": [
+    "cc",
+    "--version"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T04:23:12Z",
+  "allowed_skip_reason": null,
+  "exit_code": 0,
+  "stdout": {
+    "file": "compiler-version.stdout",
+    "bytes": 243,
+    "sha256": "e412d6c932acaaea35c743bc158d4ba2400ca0e3df66df406a872b2ce0f8601b"
+  },
+  "stderr": {
+    "file": "compiler-version.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "skipped": false,
+  "passed": true
+}

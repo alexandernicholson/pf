@@ -142,7 +142,8 @@ pthread pool elsewhere; no other dependencies. Linux build:
 
 The x86 expert path now reuses BF16 weights across four tokens with AVX2/FMA or
 AVX-512 (when compiled for a supporting CPU). It preserves FP32 activations and
-the original increasing-k FMA order. AVX-512 single-token experts use 64-lane
+the original increasing-k FMA order. Three-token AVX-512 remainders also share
+weights. AVX-512 single-token experts use 64-lane
 output accumulation. Dense projections share input loads across eight rows
 while preserving the original dot-product reduction order. The existing ARM kernels are unchanged.
 
@@ -156,6 +157,7 @@ generic target; native builds should be rebuilt when moved to another CPU.
 make
 make bench                 # quick, deterministic synthetic kernel suite
 make bench-cloud           # production pthread path + synthetic layer cases
+make bench-diverse         # short/long layers and irregular expert batches
 make bench-report          # rebuild offline chart and metric export
 ```
 

@@ -22,6 +22,9 @@ bench:
 bench-cloud:
 	python3 bench/run.py --label cloud --parallel --profile extended
 
+bench-diverse:
+	python3 bench/run.py --label diverse --parallel --profile diverse
+
 bench-report:
 	python3 bench/report.py
 
@@ -31,4 +34,4 @@ check:
 clean:
 	rm -f pf
 
-.PHONY: clean check bench bench-cloud bench-report
+.PHONY: clean check bench bench-cloud bench-diverse bench-report

@@ -1,0 +1,30 @@
+{
+  "name": "test-projection-native",
+  "argv": [
+    "/tmp/pf-verify-1fcx48f3/projection-native"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T04:23:41Z",
+  "allowed_skip_reason": "projection kernel unavailable",
+  "exit_code": 0,
+  "stdout": {
+    "file": "test-projection-native.stdout",
+    "bytes": 68,
+    "sha256": "b7041e0834bb31811c83dd62d26edb985140f2942c9962ccd71c0d2995588a1b"
+  },
+  "stderr": {
+    "file": "test-projection-native.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "skipped": false,
+  "passed": true
+}

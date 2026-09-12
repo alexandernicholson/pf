@@ -1,0 +1,43 @@
+{
+  "name": "build-projection-sanitized",
+  "argv": [
+    "cc",
+    "-O1",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-pthread",
+    "-march=native",
+    "-g",
+    "-fsanitize=address,undefined",
+    "-fno-omit-frame-pointer",
+    "-o",
+    "/tmp/pf-verify-1fcx48f3/projection-sanitized",
+    "bench/test_projection.c",
+    "-lm"
+  ],
+  "cwd": "/workspace/scratch/bd054ed0e458/pf-cloud",
+  "env_overrides": {},
+  "env_removed": [
+    "PF_SERIAL"
+  ],
+  "timeout_s": 60,
+  "stdin": "empty",
+  "expected_exit": 0,
+  "expected_stderr_substring": null,
+  "started_utc": "2026-09-12T04:23:41Z",
+  "allowed_skip_reason": null,
+  "exit_code": 0,
+  "stdout": {
+    "file": "build-projection-sanitized.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "build-projection-sanitized.stderr",
+    "bytes": 1231,
+    "sha256": "8b736b0cf7da6d672f36e91276d782d369f11fff1bb0f3b49d695b244d8593fe"
+  },
+  "skipped": false,
+  "passed": true
+}

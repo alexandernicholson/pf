@@ -1,0 +1,1222 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-09-12T04:22:21.614264+00:00",
+  "method": "Pool raw repetitions with equal weight; speedup = control median / candidate median.",
+  "cpu_definition": "process_cpu_ns / loops: aggregate process CPU time per invocation, in nanoseconds.",
+  "validation": {
+    "all_runs_passed_complete": true,
+    "identical_case_sets": true,
+    "identical_harness_and_runner": true,
+    "failed_reference_values": 0,
+    "unstable_samples": 0,
+    "all_case_hashes_match": true
+  },
+  "control": [
+    {
+      "id": "042",
+      "path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T041925.797943Z-042-final-control",
+      "label": "042-final-control",
+      "started_utc": "2026-09-12T04:19:25.825832+00:00",
+      "completed_utc": "2026-09-12T04:19:46.299356+00:00",
+      "source_sha256": "971913470e097088096e8e1419fb3e03777f61d1163e5d16119df2b323c37f98",
+      "harness_sha256": "adbe2839bf171c674d7771e1e20e837a4c6747fc9ae2b452c3e146c043ed7fbe",
+      "runner_sha256": "364de14d7b8d16efd3412cafa386182b1151ab2d52a701c75f891613779e5bcd",
+      "manifest_sha256": "bbaa233f7988f3c1e2a9d5c547b8c151e824a6a3f523f0954144710620513b66",
+      "records_sha256": "ad0838dd614400d494cf12204b16fb901f0664fb275419c958fcde6c0651d4a4",
+      "compiler": {
+        "cc": "cc",
+        "cflags": "-D_GNU_SOURCE -O3 -std=c11 -Wall -Wextra -march=native",
+        "ldflags": "-lm -pthread"
+      },
+      "compiler_version": "cc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "threads": {
+        "parallel": true,
+        "requested_pf_threads": "8",
+        "recorded_effective_threads": null,
+        "affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "cpu_quota": "800000 100000\n"
+      },
+      "metadata": {
+        "type": "metadata",
+        "schema_version": 1,
+        "suite": "pf_synthetic_kernels_v1",
+        "seed_hex": "51a77e09",
+        "model_weights": false,
+        "D": 640,
+        "FF": 640,
+        "NE": 128,
+        "MOE_B": 16,
+        "reference": "independent_double",
+        "clock": "CLOCK_MONOTONIC",
+        "reps": 9,
+        "target_ms": 70.0,
+        "profile": "diverse"
+      },
+      "reps": 9,
+      "target_ms": 70.0
+    },
+    {
+      "id": "045",
+      "path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T042159.251248Z-045-final-control-repeat",
+      "label": "045-final-control-repeat",
+      "started_utc": "2026-09-12T04:21:59.276960+00:00",
+      "completed_utc": "2026-09-12T04:22:20.864954+00:00",
+      "source_sha256": "971913470e097088096e8e1419fb3e03777f61d1163e5d16119df2b323c37f98",
+      "harness_sha256": "adbe2839bf171c674d7771e1e20e837a4c6747fc9ae2b452c3e146c043ed7fbe",
+      "runner_sha256": "364de14d7b8d16efd3412cafa386182b1151ab2d52a701c75f891613779e5bcd",
+      "manifest_sha256": "be19718c3b4248b93e6ec7db72c5f77e8d1038639eeacce2b72c92e2aa8cc516",
+      "records_sha256": "298140604a243628392fd78b376d3612afa2e6d298bb550a1e8b1fffe6d36511",
+      "compiler": {
+        "cc": "cc",
+        "cflags": "-D_GNU_SOURCE -O3 -std=c11 -Wall -Wextra -march=native",
+        "ldflags": "-lm -pthread"
+      },
+      "compiler_version": "cc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "threads": {
+        "parallel": true,
+        "requested_pf_threads": "8",
+        "recorded_effective_threads": null,
+        "affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "cpu_quota": "800000 100000\n"
+      },
+      "metadata": {
+        "type": "metadata",
+        "schema_version": 1,
+        "suite": "pf_synthetic_kernels_v1",
+        "seed_hex": "51a77e09",
+        "model_weights": false,
+        "D": 640,
+        "FF": 640,
+        "NE": 128,
+        "MOE_B": 16,
+        "reference": "independent_double",
+        "clock": "CLOCK_MONOTONIC",
+        "reps": 9,
+        "target_ms": 70.0,
+        "profile": "diverse"
+      },
+      "reps": 9,
+      "target_ms": 70.0
+    }
+  ],
+  "candidate": [
+    {
+      "id": "043",
+      "path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T042022.508141Z-043-final-triple",
+      "label": "043-final-triple",
+      "started_utc": "2026-09-12T04:20:22.538022+00:00",
+      "completed_utc": "2026-09-12T04:20:43.482168+00:00",
+      "source_sha256": "5f870a795b83e632aa74a39a1d019865707558848dbc00eec639ee8d9e2f10e1",
+      "harness_sha256": "adbe2839bf171c674d7771e1e20e837a4c6747fc9ae2b452c3e146c043ed7fbe",
+      "runner_sha256": "364de14d7b8d16efd3412cafa386182b1151ab2d52a701c75f891613779e5bcd",
+      "manifest_sha256": "b5848d5ae5e4dcab2983b16a16d532751aa9cfe8524a8fbab16f446fb8a23057",
+      "records_sha256": "91c469c7647bdc28a3287ec0d513f549c2df9e17a42b9a389d76da2a1e56e44c",
+      "compiler": {
+        "cc": "cc",
+        "cflags": "-D_GNU_SOURCE -O3 -std=c11 -Wall -Wextra -march=native",
+        "ldflags": "-lm -pthread"
+      },
+      "compiler_version": "cc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "threads": {
+        "parallel": true,
+        "requested_pf_threads": "8",
+        "recorded_effective_threads": null,
+        "affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "cpu_quota": "800000 100000\n"
+      },
+      "metadata": {
+        "type": "metadata",
+        "schema_version": 1,
+        "suite": "pf_synthetic_kernels_v1",
+        "seed_hex": "51a77e09",
+        "model_weights": false,
+        "D": 640,
+        "FF": 640,
+        "NE": 128,
+        "MOE_B": 16,
+        "reference": "independent_double",
+        "clock": "CLOCK_MONOTONIC",
+        "reps": 9,
+        "target_ms": 70.0,
+        "profile": "diverse"
+      },
+      "reps": 9,
+      "target_ms": 70.0
+    },
+    {
+      "id": "044",
+      "path": "/workspace/scratch/bd054ed0e458/pf-cloud/bench/results/20260912T042102.400443Z-044-final-triple-repeat",
+      "label": "044-final-triple-repeat",
+      "started_utc": "2026-09-12T04:21:02.446915+00:00",
+      "completed_utc": "2026-09-12T04:21:25.284861+00:00",
+      "source_sha256": "5f870a795b83e632aa74a39a1d019865707558848dbc00eec639ee8d9e2f10e1",
+      "harness_sha256": "adbe2839bf171c674d7771e1e20e837a4c6747fc9ae2b452c3e146c043ed7fbe",
+      "runner_sha256": "364de14d7b8d16efd3412cafa386182b1151ab2d52a701c75f891613779e5bcd",
+      "manifest_sha256": "359b5d3b86ba9c4549b2843248e8aeb9c97137dfbf4e544e98a0fc9df3efe532",
+      "records_sha256": "e056fe40b38f25d319acd7f4700c79832265fb7b5bd1a67731c3bfb7f3139770",
+      "compiler": {
+        "cc": "cc",
+        "cflags": "-D_GNU_SOURCE -O3 -std=c11 -Wall -Wextra -march=native",
+        "ldflags": "-lm -pthread"
+      },
+      "compiler_version": "cc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "threads": {
+        "parallel": true,
+        "requested_pf_threads": "8",
+        "recorded_effective_threads": null,
+        "affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "cpu_quota": "800000 100000\n"
+      },
+      "metadata": {
+        "type": "metadata",
+        "schema_version": 1,
+        "suite": "pf_synthetic_kernels_v1",
+        "seed_hex": "51a77e09",
+        "model_weights": false,
+        "D": 640,
+        "FF": 640,
+        "NE": 128,
+        "MOE_B": 16,
+        "reference": "independent_double",
+        "clock": "CLOCK_MONOTONIC",
+        "reps": 9,
+        "target_ms": 70.0,
+        "profile": "diverse"
+      },
+      "reps": 9,
+      "target_ms": 70.0
+    }
+  ],
+  "cases": {
+    "moe_e1_m1": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 119689.4960855,
+          "min": 115394.018349,
+          "max": 125940.86413
+        },
+        "candidate": {
+          "n": 18,
+          "median": 117494.848485,
+          "min": 111654.690698,
+          "max": 141497.237209
+        },
+        "speedup": 1.0186786708421534
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 119677.57761600852,
+          "min": 115401.75,
+          "max": 125841.77293577982
+        },
+        "candidate": {
+          "n": 18,
+          "median": 117502.81601731601,
+          "min": 111660.3,
+          "max": 141524.53953488372
+        },
+        "speedup": 1.0185081657819335
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "0146e0c81856c9d7"
+          ],
+          "candidate": [
+            "0146e0c81856c9d7"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "moe_e1_m4": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 221414.34202450002,
+          "min": 202355.530675,
+          "max": 271338.075163
+        },
+        "candidate": {
+          "n": 18,
+          "median": 209578.01087,
+          "min": 197823.865772,
+          "max": 247899.194631
+        },
+        "speedup": 1.0564769705818138
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 221315.879034845,
+          "min": 202362.1319018405,
+          "max": 270989.0294117647
+        },
+        "candidate": {
+          "n": 18,
+          "median": 209567.51086956522,
+          "min": 197720.86241610738,
+          "max": 247912.8456375839
+        },
+        "speedup": 1.056060064446688
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "43d402b2a13c7225"
+          ],
+          "candidate": [
+            "43d402b2a13c7225"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "moe_e1_m16": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 695010.9114585,
+          "min": 604757.891892,
+          "max": 869268.552083
+        },
+        "candidate": {
+          "n": 18,
+          "median": 659171.5786995,
+          "min": 598355.252427,
+          "max": 849270.949495
+        },
+        "speedup": 1.0543702640057822
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 694865.75,
+          "min": 604792.5585585586,
+          "max": 869171.7604166666
+        },
+        "candidate": {
+          "n": 18,
+          "median": 659211.2278611356,
+          "min": 598389.8446601941,
+          "max": 849302.696969697
+        },
+        "speedup": 1.0540866426904596
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "cd18a56f018bbf8a"
+          ],
+          "candidate": [
+            "cd18a56f018bbf8a"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "moe_e32_m1": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 2189990.1660715,
+          "min": 1706166.2,
+          "max": 2576244.742857
+        },
+        "candidate": {
+          "n": 18,
+          "median": 2015541.529412,
+          "min": 1667340.588235,
+          "max": 2477737.571429
+        },
+        "speedup": 1.08655174508381
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 13173562.591071427,
+          "min": 11316942.625,
+          "max": 15005266.82857143
+        },
+        "candidate": {
+          "n": 18,
+          "median": 12049435.67857143,
+          "min": 11011515.029411765,
+          "max": 15146133.357142856
+        },
+        "speedup": 1.093292909517674
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "63360f06b6b28d9b"
+          ],
+          "candidate": [
+            "63360f06b6b28d9b"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "moe_e128_m1": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 7554379.45,
+          "min": 6297138.7,
+          "max": 9035904.222222
+        },
+        "candidate": {
+          "n": 18,
+          "median": 7421558.7045455,
+          "min": 6285829.636364,
+          "max": 9949907.166667
+        },
+        "speedup": 1.0178966105022051
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 54538942.849999994,
+          "min": 47994452.4,
+          "max": 63503461.11111111
+        },
+        "candidate": {
+          "n": 18,
+          "median": 53637483.36363636,
+          "min": 47387545.72727273,
+          "max": 63071416.0
+        },
+        "speedup": 1.0168065209221726
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "e37ad641e3266ca7"
+          ],
+          "candidate": [
+            "e37ad641e3266ca7"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "moe_e32_m4": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 3878669.8839285,
+          "min": 3022774.285714,
+          "max": 4896265.875
+        },
+        "candidate": {
+          "n": 18,
+          "median": 3748599.74,
+          "min": 2559326.285714,
+          "max": 15490770.36
+        },
+        "speedup": 1.0346983281625315
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 24168577.39285714,
+          "min": 20102635.5,
+          "max": 29946248.0625
+        },
+        "candidate": {
+          "n": 18,
+          "median": 24844965.234285712,
+          "min": 17618085.19047619,
+          "max": 29833754.08
+        },
+        "speedup": 0.9727756575607857
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "b6966fe2231dadcf"
+          ],
+          "candidate": [
+            "b6966fe2231dadcf"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "projection_qkv": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 67977.4506175,
+          "min": 58227.870588,
+          "max": 88980.717284
+        },
+        "candidate": {
+          "n": 18,
+          "median": 64623.2315665,
+          "min": 59614.834684,
+          "max": 137657.133641
+        },
+        "speedup": 1.051904229635257
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 67943.33024691358,
+          "min": 58232.06117647059,
+          "max": 88984.85679012346
+        },
+        "candidate": {
+          "n": 18,
+          "median": 64628.54435483871,
+          "min": 59618.75364667747,
+          "max": 113619.0138248848
+        },
+        "speedup": 1.0512898120353023
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "38f115d4247f6df3"
+          ],
+          "candidate": [
+            "38f115d4247f6df3"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "projection_out": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 39262.266424500005,
+          "min": 35144.149596,
+          "max": 47312.218329
+        },
+        "candidate": {
+          "n": 18,
+          "median": 45599.280047,
+          "min": 36211.765122,
+          "max": 111316.962547
+        },
+        "speedup": 0.8610282088671505
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 39235.564288278634,
+          "min": 35099.729110512126,
+          "max": 47319.14959568733
+        },
+        "candidate": {
+          "n": 18,
+          "median": 45597.23841319717,
+          "min": 36215.19402985075,
+          "max": 99651.06367041198
+        },
+        "speedup": 0.8604811531069109
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "09bf54a97e8dc9de"
+          ],
+          "candidate": [
+            "09bf54a97e8dc9de"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "phase_b_t32": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 570286.7652665,
+          "min": 421281.485075,
+          "max": 793449.858209
+        },
+        "candidate": {
+          "n": 18,
+          "median": 491416.67000000004,
+          "min": 382831.344538,
+          "max": 683893.32
+        },
+        "speedup": 1.1604953598063734
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 2687501.258974734,
+          "min": 2238135.209150327,
+          "max": 3466863.6013071896
+        },
+        "candidate": {
+          "n": 18,
+          "median": 2601771.27,
+          "min": 2164499.092436975,
+          "max": 2885228.1092436975
+        },
+        "speedup": 1.0329506248159679
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "3244b5efb5a5e140"
+          ],
+          "candidate": [
+            "3244b5efb5a5e140"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "phase_b_t256": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 5268878.071429,
+          "min": 4237564.5,
+          "max": 6053049.571429
+        },
+        "candidate": {
+          "n": 18,
+          "median": 4882511.707142999,
+          "min": 4366821.533333,
+          "max": 17701822.785714
+        },
+        "speedup": 1.0791327061685805
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 37036269.09453782,
+          "min": 31888512.35714286,
+          "max": 40163977.705882356
+        },
+        "candidate": {
+          "n": 18,
+          "median": 35133338.233333334,
+          "min": 32805257.4,
+          "max": 46245806.71428572
+        },
+        "speedup": 1.0541631099375306
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "89d3eae44a90b17d"
+          ],
+          "candidate": [
+            "89d3eae44a90b17d"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "phase_b_packed_t256_s32": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 3032414.5806449996,
+          "min": 2274220.625,
+          "max": 4195332.580645
+        },
+        "candidate": {
+          "n": 18,
+          "median": 3109525.9259254998,
+          "min": 2364470.464286,
+          "max": 8301666.37037
+        },
+        "speedup": 0.9752015750576033
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 19385872.532258064,
+          "min": 16365499.958333334,
+          "max": 26272244.419354837
+        },
+        "candidate": {
+          "n": 18,
+          "median": 19848415.20568783,
+          "min": 16487742.642857144,
+          "max": 25422400.777777776
+        },
+        "speedup": 0.9766962415569976
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "a25ad169c2e8a400"
+          ],
+          "candidate": [
+            "a25ad169c2e8a400"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "layer_t32": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 8933457.083333,
+          "min": 6215388.888889,
+          "max": 13883472.333333
+        },
+        "candidate": {
+          "n": 18,
+          "median": 6871345.327381,
+          "min": 5741383.571429,
+          "max": 8899693.0
+        },
+        "speedup": 1.3001030595471426
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 57843677.94444445,
+          "min": 42715048.222222224,
+          "max": 70758236.5
+        },
+        "candidate": {
+          "n": 18,
+          "median": 47551584.375,
+          "min": 41055295.571428575,
+          "max": 51970553.416666664
+        },
+        "speedup": 1.2164406024472123
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "e4aa7f464eb28cdc"
+          ],
+          "candidate": [
+            "e4aa7f464eb28cdc"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "layer_packed_t256_s32": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 21776907.0,
+          "min": 16969118.5,
+          "max": 31731775.75
+        },
+        "candidate": {
+          "n": 18,
+          "median": 19854905.875,
+          "min": 15997040.75,
+          "max": 24591270.25
+        },
+        "speedup": 1.0968023287091004
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 158825112.5,
+          "min": 129277558.5,
+          "max": 216334986.25
+        },
+        "candidate": {
+          "n": 18,
+          "median": 144785584.0,
+          "min": 122221228.5,
+          "max": 167491068.5
+        },
+        "speedup": 1.0969677236650854
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "0c2efb4c4b4d1dd4"
+          ],
+          "candidate": [
+            "0c2efb4c4b4d1dd4"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "moe_e1_m3": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 264646.16983100004,
+          "min": 222265.476793,
+          "max": 491949.964912
+        },
+        "candidate": {
+          "n": 18,
+          "median": 174028.5588235,
+          "min": 167815.067204,
+          "max": 212699.172043
+        },
+        "speedup": 1.520705403872272
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 263995.5003886298,
+          "min": 222280.89451476792,
+          "max": 491070.98245614034
+        },
+        "candidate": {
+          "n": 18,
+          "median": 173746.179028133,
+          "min": 167744.79539641945,
+          "max": 212657.71774193548
+        },
+        "speedup": 1.5194319775278835
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "4c548669be255ea5"
+          ],
+          "candidate": [
+            "4c548669be255ea5"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "moe_e1_m7": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 439673.8989425,
+          "min": 352885.863388,
+          "max": 1242064.363636
+        },
+        "candidate": {
+          "n": 18,
+          "median": 312223.73043500003,
+          "min": 299515.897196,
+          "max": 403340.476636
+        },
+        "speedup": 1.408201414831385
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 439129.5516286992,
+          "min": 352893.51912568306,
+          "max": 1240713.3116883116
+        },
+        "candidate": {
+          "n": 18,
+          "median": 311819.18260869564,
+          "min": 299538.5560747664,
+          "max": 403216.97196261684
+        },
+        "speedup": 1.408282671883488
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "14420c8b9c4d3c06"
+          ],
+          "candidate": [
+            "14420c8b9c4d3c06"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "moe_e1_m15": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 715383.2216665,
+          "min": 636654.81,
+          "max": 906104.262626
+        },
+        "candidate": {
+          "n": 18,
+          "median": 594454.21875,
+          "min": 556368.018692,
+          "max": 747547.168224
+        },
+        "speedup": 1.203428622595674
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 714981.6875252526,
+          "min": 635576.75,
+          "max": 906175.5858585859
+        },
+        "candidate": {
+          "n": 18,
+          "median": 594419.6785714286,
+          "min": 556409.1495327103,
+          "max": 746927.5794392524
+        },
+        "speedup": 1.2028230445593107
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "24172ea1de166051"
+          ],
+          "candidate": [
+            "24172ea1de166051"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "moe_e32_uneven_m1_31": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 6850822.75,
+          "min": 5271932.416667,
+          "max": 14544762.416667
+        },
+        "candidate": {
+          "n": 18,
+          "median": 6615002.958333,
+          "min": 5427544.0,
+          "max": 7963938.166667
+        },
+        "speedup": 1.0356492344980641
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 47903067.25,
+          "min": 38189103.083333336,
+          "max": 58040969.75
+        },
+        "candidate": {
+          "n": 18,
+          "median": 45766371.833333336,
+          "min": 38428905.416666664,
+          "max": 51081956.333333336
+        },
+        "speedup": 1.0466870178052967
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "373327254806e9cf"
+          ],
+          "candidate": [
+            "373327254806e9cf"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "layer_t1": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 626918.7394215,
+          "min": 526846.0,
+          "max": 1058808.701149
+        },
+        "candidate": {
+          "n": 18,
+          "median": 478962.853211,
+          "min": 421654.513761,
+          "max": 712807.311927
+        },
+        "speedup": 1.308908896000167
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 1170350.331943918,
+          "min": 1074012.7692307692,
+          "max": 1695018.7586206896
+        },
+        "candidate": {
+          "n": 18,
+          "median": 968507.9403669725,
+          "min": 884118.4862385321,
+          "max": 1301042.5229357798
+        },
+        "speedup": 1.208405510336308
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "e44b03b0ab2c09bc"
+          ],
+          "candidate": [
+            "e44b03b0ab2c09bc"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "layer_t8": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 2935402.4117644997,
+          "min": 2085494.0,
+          "max": 4342572.571429
+        },
+        "candidate": {
+          "n": 18,
+          "median": 2249318.7205884997,
+          "min": 1950890.25,
+          "max": 3229053.441176
+        },
+        "speedup": 1.305018441760222
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 14662584.155462185,
+          "min": 12496534.823529411,
+          "max": 18259684.07142857
+        },
+        "candidate": {
+          "n": 18,
+          "median": 12525941.703125,
+          "min": 11374630.0,
+          "max": 14156822.11764706
+        },
+        "speedup": 1.1705773907445323
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "0ea07120ed5e0d5e"
+          ],
+          "candidate": [
+            "0ea07120ed5e0d5e"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "layer_packed_t512_s64": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 41026014.9166665,
+          "min": 31348354.333333,
+          "max": 52517447.0
+        },
+        "candidate": {
+          "n": 18,
+          "median": 34572845.833333,
+          "min": 26876840.333333,
+          "max": 43482247.0
+        },
+        "speedup": 1.1866542637086517
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 308804834.0833334,
+          "min": 242989569.33333334,
+          "max": 382943991.0
+        },
+        "candidate": {
+          "n": 18,
+          "median": 260735938.1666667,
+          "min": 207379752.33333334,
+          "max": 311275448.0
+        },
+        "speedup": 1.1843585362825597
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "119de5dc5e80eb6e"
+          ],
+          "candidate": [
+            "119de5dc5e80eb6e"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "phase_b_t512": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 11124352.4791665,
+          "min": 9341031.875,
+          "max": 14603763.166667
+        },
+        "candidate": {
+          "n": 18,
+          "median": 10356577.625,
+          "min": 8191490.125,
+          "max": 11769785.25
+        },
+        "speedup": 1.0741340317203967
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 81742936.41666666,
+          "min": 70201299.625,
+          "max": 98388481.33333333
+        },
+        "candidate": {
+          "n": 18,
+          "median": 76680652.5625,
+          "min": 62918974.125,
+          "max": 89996517.875
+        },
+        "speedup": 1.0660177461327751
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "6d217be27e4d18ea"
+          ],
+          "candidate": [
+            "6d217be27e4d18ea"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    },
+    "layer_t512": {
+      "wall_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 41620996.0,
+          "min": 34279331.0,
+          "max": 58245276.0
+        },
+        "candidate": {
+          "n": 18,
+          "median": 37392151.1666665,
+          "min": 30899442.666667,
+          "max": 52345121.333333
+        },
+        "speedup": 1.1130944516800985
+      },
+      "cpu_ns_per_call": {
+        "control": {
+          "n": 18,
+          "median": 314087217.75,
+          "min": 259171877.5,
+          "max": 426635072.0
+        },
+        "candidate": {
+          "n": 18,
+          "median": 284225022.1666666,
+          "min": 238985339.33333334,
+          "max": 389999473.6666667
+        },
+        "speedup": 1.1050653294199497
+      },
+      "correctness": {
+        "output_hashes": {
+          "control": [
+            "af5be2d9aaf5d952"
+          ],
+          "candidate": [
+            "af5be2d9aaf5d952"
+          ]
+        },
+        "exact_hash_match": true,
+        "failed_reference_values": 0,
+        "unstable_samples": 0
+      }
+    }
+  }
+}

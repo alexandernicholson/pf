@@ -1,0 +1,66 @@
+diff --git a/bench/test_x86_moe.c b/bench/test_x86_moe.c
+index 78faf47..a435604 100644
+--- a/bench/test_x86_moe.c
++++ b/bench/test_x86_moe.c
+@@ -132,9 +132,17 @@ int main(void) {
+             }
+         }
+     }
+-    /* 40 input rows also checks a partial reduction tile for KT=16/32/64. */
+-    failed += test_shape(7, 40, 640, 1);
+-    cases++;
++    /* Three-token remainders after one, two, and three complete token
++     * blocks, with partial reduction tiles for KT=16/32/64. These small
++     * shapes cover both model output widths without repeating costly full
++     * 640-row reductions already exercised above. */
++    int tail_batches[] = {7, 11, 15};
++    for (int shape = 0; shape < 2; shape++) {
++        for (size_t b = 0; b < sizeof tail_batches / sizeof *tail_batches; b++) {
++            failed += test_shape(tail_batches[b], 40, shape ? 1280 : 640, 1);
++            cases++;
++        }
++    }
+     printf("{\"record\":\"summary\",\"cases\":%d,\"failed_cases\":%d,"
+            "\"status\":\"%s\"}\n", cases, failed, failed ? "fail" : "pass");
+     return failed ? 1 : 0;
+diff --git a/pf.c b/pf.c
+index ef14634..40f7ea6 100644
+--- a/pf.c
++++ b/pf.c
+@@ -456,6 +456,36 @@ static void moe_gemm_x86(const bf16 *w, const float *const *xs, float *const *ys
+                     moe_store(ys[i+3] + j + v * MOE_V, a3[v]);
+                 }
+             }
++#if !defined(PF_NO_MOE_TRIPLE) && (MOE_V == 16 || defined(PF_MOE_TRIPLE))
++            /* Three leftover tokens share weight loads and BF16 conversion.
++             * Each output keeps the original increasing-k FMA sequence. */
++            if (i + 3 <= B) {
++                moe_vec a0[MOE_NV], a1[MOE_NV], a2[MOE_NV];
++                for (int v = 0; v < MOE_NV; v++) {
++                    a0[v] = moe_load(ys[i] + j + v * MOE_V);
++                    a1[v] = moe_load(ys[i+1] + j + v * MOE_V);
++                    a2[v] = moe_load(ys[i+2] + j + v * MOE_V);
++                }
++                for (int k = kt; k < kend; k++) {
++                    moe_vec x0 = moe_bcast(xs[i][k]);
++                    moe_vec x1 = moe_bcast(xs[i+1][k]);
++                    moe_vec x2 = moe_bcast(xs[i+2][k]);
++                    const bf16 *wk = w + (size_t)k * n_out + j;
++                    for (int v = 0; v < MOE_NV; v++) {
++                        moe_vec wv = moe_weight(wk + v * MOE_V);
++                        a0[v] = moe_fma(x0, wv, a0[v]);
++                        a1[v] = moe_fma(x1, wv, a1[v]);
++                        a2[v] = moe_fma(x2, wv, a2[v]);
++                    }
++                }
++                for (int v = 0; v < MOE_NV; v++) {
++                    moe_store(ys[i] + j + v * MOE_V, a0[v]);
++                    moe_store(ys[i+1] + j + v * MOE_V, a1[v]);
++                    moe_store(ys[i+2] + j + v * MOE_V, a2[v]);
++                }
++                i += 3;
++            }
++#endif
+             for (; i < B; i++) {
+                 moe_vec a[MOE_NV];
+                 for (int v = 0; v < MOE_NV; v++)
