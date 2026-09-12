@@ -9,17 +9,25 @@
  * Weights: ./model/{config.json,model.safetensors,o200k_base.tiktoken}
  *          (original-format checkpoint from HF openai/privacy-filter, original/)
  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <strings.h>
+#include <errno.h>
+#include <time.h>
 #include <math.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <pthread.h>
+#if defined(__linux__)
+#include <sched.h>
+#endif
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <signal.h>
@@ -41,7 +49,7 @@
 #else
 #define DOT_X(xf, xh, w, n)            dot_bf16(xf, w, n)
 #define AXPY8_X(xf, xh, w, stride, y, n) axpy8_bf16(xf, w, stride, y, n)
-#define CVT_H(x, y, n)                 ((void)0)
+#define CVT_H(x, y, n)                 ((void)(x), (void)(y), (void)(n))
 #endif
 
 /* ------------------------------------------------------------------ config */
@@ -82,8 +90,9 @@ typedef uint16_t bf16;
 
 static void die(const char *msg) { fprintf(stderr, "pf: %s\n", msg); exit(1); }
 static double now_ms(void) {
-    struct timeval tv; gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1e3 + tv.tv_usec * 1e-3;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1e3 + ts.tv_nsec * 1e-6;
 }
 
 /* ------------------------------------------------------------ SIMD kernels */
@@ -355,6 +364,40 @@ static int pf_serial = -1;
 #if !defined(__APPLE__) || defined(PF_POOL)
 /* portable pthread worker pool (Linux/Graviton; libdispatch is Apple-only) */
 #include <stdatomic.h>
+/* Bound the pool by CPUs usable by this process, including common containers.
+ * PF_THREADS overrides the automatic limit for explicit benchmark sweeps. */
+static int pool_threads(void) {
+    const char *env = getenv("PF_THREADS");
+    if (env) {
+        char *end;
+        errno = 0;
+        long n = strtol(env, &end, 10);
+        if (errno || end == env || *end || n < 1 || n > 64)
+            die("PF_THREADS must be an integer from 1 to 64");
+        return (int)n;
+    }
+    long nc = sysconf(_SC_NPROCESSORS_ONLN);
+    int n = nc < 1 ? 1 : (nc > 64 ? 64 : (int)nc);
+#if defined(__linux__)
+    cpu_set_t set;
+    if (sched_getaffinity(0, sizeof set, &set) == 0) {
+        int count = CPU_COUNT(&set);
+        if (count > 0 && count < n) n = count;
+    }
+    FILE *f = fopen("/sys/fs/cgroup/cpu.max", "r");
+    if (f) {
+        unsigned long long quota, period;
+        if (fscanf(f, "%llu %llu", &quota, &period) == 2 && period > 0) {
+            unsigned long long count = quota / period;
+            if (count < 1) count = 1;
+            if (count < (unsigned)n) n = (int)count;
+        }
+        fclose(f);
+    }
+#endif
+    return n;
+}
+
 static struct {
     pthread_t th[64];
     pthread_mutex_t mu;
@@ -384,11 +427,16 @@ static void *pp_worker(void *arg) {
 
 static void pool_pfor(size_t n, void (*fn)(void *, size_t), void *ctx) {
     if (!PP.started) {
-        long nc = sysconf(_SC_NPROCESSORS_ONLN);
-        PP.nthreads = nc < 1 ? 1 : (nc > 64 ? 64 : (int)nc);
-        for (int i = 0; i < PP.nthreads; i++)
-            pthread_create(&PP.th[i], NULL, pp_worker, NULL);
+        PP.nthreads = pool_threads();
+        if (PP.nthreads > 1)
+            for (int i = 0; i < PP.nthreads; i++)
+                if (pthread_create(&PP.th[i], NULL, pp_worker, NULL) != 0)
+                    die("cannot create worker thread");
         PP.started = 1;
+    }
+    if (PP.nthreads == 1 || n <= 1) {
+        for (size_t i = 0; i < n; i++) fn(ctx, i);
+        return;
     }
     pthread_mutex_lock(&PP.mu);
     PP.fn = fn; PP.ctx = ctx; PP.n = n;

@@ -1,0 +1,4 @@
+pf.c: In function ‘http_handle’:
+pf.c:1743:37: warning: unused parameter ‘n_ctx’ [-Wunused-parameter]
+ 1743 | static void http_handle(int fd, int n_ctx, int use_argmax) {
+      |                                 ~~~~^~~~~

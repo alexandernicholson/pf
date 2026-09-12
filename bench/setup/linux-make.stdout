@@ -1,0 +1,1 @@
+cc  -O3 -std=c11 -Wall -Wextra -march=native -pthread -o pf pf.c  -lm

@@ -1,0 +1,56 @@
+cc: warning: ‘-mcpu=’ is deprecated; use ‘-mtune=’ or ‘-march=’ instead
+pf.c: In function ‘st_open’:
+pf.c:446:5: warning: implicit declaration of function ‘madvise’; did you mean ‘raise’? [-Wimplicit-function-declaration]
+  446 |     madvise(m, st_size, MADV_WILLNEED);
+      |     ^~~~~~~
+      |     raise
+pf.c:446:25: error: ‘MADV_WILLNEED’ undeclared (first use in this function)
+  446 |     madvise(m, st_size, MADV_WILLNEED);
+      |                         ^~~~~~~~~~~~~
+pf.c:446:25: note: each undeclared identifier is reported only once for each function it appears in
+pf.c: In function ‘tokenize’:
+pf.c:815:34: warning: implicit declaration of function ‘memmem’; did you mean ‘memset’? [-Wimplicit-function-declaration]
+  815 |             const uint8_t *hit = memmem(s + i, n - i, lit, ll);
+      |                                  ^~~~~~
+      |                                  memset
+pf.c:815:34: warning: initialization of ‘const uint8_t *’ {aka ‘const unsigned char *’} from ‘int’ makes pointer from integer without a cast [-Wint-conversion]
+pf.c: In function ‘rope_init’:
+pf.c:883:62: error: ‘M_PI’ undeclared (first use in this function)
+  883 |     double low  = d_half * log(YARN_ORIG / (YARN_BETA  * 2 * M_PI)) / log(ROPE_THETA);
+      |                                                              ^~~~
+pf.c: In function ‘ph_a’:
+pf.c:927:11: warning: unused variable ‘th’ [-Wunused-variable]
+  927 |     bf16 *th = R.tbh + t * D;
+      |           ^~
+pf.c: In function ‘ph_b’:
+pf.c:957:53: error: ‘M_LN2’ undeclared (first use in this function)
+  957 |         float sink = M.L[R.layer].sinks[h] * (float)M_LN2;
+      |                                                     ^~~~~
+pf.c:1008:11: warning: unused variable ‘th’ [-Wunused-variable]
+ 1008 |     bf16 *th = R.tbh + t * D;
+      |           ^~
+pf.c:1002:10: warning: unused variable ‘aoh’ [-Wunused-variable]
+ 1002 |     bf16 aoh[QD];
+      |          ^~~
+pf.c: In function ‘batcher_main’:
+pf.c:1689:30: warning: implicit declaration of function ‘usleep’; did you mean ‘sleep’? [-Wimplicit-function-declaration]
+ 1689 |         if (g_linger_us > 0) usleep((useconds_t)g_linger_us);   /* let peers pile in */
+      |                              ^~~~~~
+      |                              sleep
+pf.c:1689:38: error: ‘useconds_t’ undeclared (first use in this function); did you mean ‘suseconds_t’?
+ 1689 |         if (g_linger_us > 0) usleep((useconds_t)g_linger_us);   /* let peers pile in */
+      |                                      ^~~~~~~~~~
+      |                                      suseconds_t
+pf.c:1689:49: error: expected ‘)’ before ‘g_linger_us’
+ 1689 |         if (g_linger_us > 0) usleep((useconds_t)g_linger_us);   /* let peers pile in */
+      |                                    ~            ^~~~~~~~~~~
+      |                                                 )
+pf.c: In function ‘http_handle’:
+pf.c:1747:26: warning: implicit declaration of function ‘strncasecmp’; did you mean ‘strncmp’? [-Wimplicit-function-declaration]
+ 1747 |                     if (!strncasecmp(req.p + i, "content-length:", 15)) {
+      |                          ^~~~~~~~~~~
+      |                          strncmp
+pf.c:1734:37: warning: unused parameter ‘n_ctx’ [-Wunused-parameter]
+ 1734 | static void http_handle(int fd, int n_ctx, int use_argmax) {
+      |                                 ~~~~^~~~~
+make: *** [Makefile:6: pf] Error 1
