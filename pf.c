@@ -75,6 +75,9 @@
 #endif
 
 static float g_skip_beta = 0.0f;   /* --skip-beta: dynamic expert skipping */
+static int   g_ff = FF;            /* expert intermediate width; < FF after --trim */
+static double (*g_calib)[NE][FF];  /* --calib: per-neuron sum of gate * |swiglu out| */
+static pthread_mutex_t g_calib_mu = PTHREAD_MUTEX_INITIALIZER;
 static const char *CAT[NCAT] = {"account_number","private_address","private_date",
     "private_email","private_person","private_phone","private_url","secret"};
 
@@ -475,8 +478,8 @@ typedef struct {
     bf16 *attn_norm, *qkv_w, *qkv_b, *attn_out_w, *attn_out_b;
     float *sinks;                      /* [NH] F32, log2 space */
     bf16 *mlp_norm, *gate_w, *gate_b;
-    bf16 *w1, *b1;                     /* [NE][D][2FF], [NE][2FF] */
-    bf16 *w2, *b2;                     /* [NE][FF][D],  [NE][D]  */
+    bf16 *w1, *b1;                     /* [NE][D][2W], [NE][2W]  (W = g_ff) */
+    bf16 *w2, *b2;                     /* [NE][W][D],  [NE][D]  */
 } Layer;
 
 static struct {
@@ -512,6 +515,67 @@ static void model_load(const char *dir) {
         GET(b2,         "mlp.out.bias",    "BF16", (size_t)NE * D);
 #undef GET
     }
+}
+
+/* --trim: keep g_ff of the FF intermediate neurons of every expert, re-packing
+ * the expert weights densely so the MoE GEMMs shrink by g_ff/FF. Mask file:
+ * "PFTRIM1\0", u32 width, then NL*NE*FF keep bits (LSB first), built by trim.py. */
+static void trim_load(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) die("cannot open --trim mask");
+    static uint8_t bits[NL * NE * FF / 8];
+    char magic[8]; uint32_t w = 0;
+    if (fread(magic, 1, 8, f) != 8 || memcmp(magic, "PFTRIM1", 8) ||
+        fread(&w, 4, 1, f) != 1 || fread(bits, 1, sizeof bits, f) != sizeof bits || fgetc(f) != EOF)
+        die("bad --trim mask file");
+    fclose(f);
+    if (w == 0 || w > FF || w % 8) die("--trim width must be a multiple of 8 in 8..640");
+    for (int l = 0; l < NL; l++) {
+        Layer *y = &M.L[l];
+        bf16 *w1 = malloc((size_t)NE * D * 2 * w * 2), *b1 = malloc((size_t)NE * 2 * w * 2);
+        bf16 *w2 = malloc((size_t)NE * w * D * 2);
+        if (!w1 || !b1 || !w2) die("out of memory");
+        for (int e = 0; e < NE; e++) {
+            int idx[FF], n = 0;
+            for (int j = 0; j < FF; j++) {
+                size_t b = ((size_t)l * NE + e) * FF + j;
+                if (bits[b >> 3] >> (b & 7) & 1) idx[n++] = j;
+            }
+            if (n != (int)w) die("--trim mask: kept-neuron count differs from width");
+            const bf16 *s1 = y->w1 + (size_t)e * D * 2 * FF, *sb = y->b1 + (size_t)e * 2 * FF;
+            const bf16 *s2 = y->w2 + (size_t)e * FF * D;
+            bf16 *d1 = w1 + (size_t)e * D * 2 * w, *db = b1 + (size_t)e * 2 * w;
+            for (int k = 0; k < D; k++)
+                for (int i = 0; i < n; i++) {   /* gate half, then linear half */
+                    d1[(size_t)k * 2 * w + i]     = s1[(size_t)k * 2 * FF + idx[i]];
+                    d1[(size_t)k * 2 * w + w + i] = s1[(size_t)k * 2 * FF + FF + idx[i]];
+                }
+            for (int i = 0; i < n; i++) {
+                db[i] = sb[idx[i]]; db[w + i] = sb[FF + idx[i]];
+                memcpy(w2 + ((size_t)e * w + i) * D, s2 + (size_t)idx[i] * D, D * sizeof(bf16));
+            }
+        }
+        y->w1 = w1; y->b1 = b1; y->w2 = w2;
+    }
+    g_ff = (int)w;
+}
+
+/* --calib: per-neuron importance E[gate * |h_j|] * ||W2 row j||, normalized per
+ * token so stats from several corpora can be summed with equal weight (trim.py).
+ * A tiny ||W2|| term breaks ties for neurons the corpus never reached. */
+static void calib_write(const char *path, size_t ntok) {
+    FILE *f = fopen(path, "wb");
+    if (!f) die("cannot write --calib stats");
+    for (int l = 0; l < NL; l++)
+        for (int e = 0; e < NE; e++)
+            for (int j = 0; j < FF; j++) {
+                const bf16 *r = M.L[l].w2 + ((size_t)e * FF + j) * D;
+                double n2 = 0;
+                for (int i = 0; i < D; i++) { float v = b2f(r[i]); n2 += (double)v * v; }
+                float s = (float)((g_calib[l][e][j] / (double)(ntok ? ntok : 1) + 1e-12) * sqrt(n2));
+                fwrite(&s, sizeof s, 1, f);
+            }
+    if (fclose(f)) die("cannot write --calib stats");
 }
 
 /* --------------------------------------------------------- unicode classes */
@@ -1040,19 +1104,19 @@ static void ph_b(void *ctx, size_t t) {
 }
 
 /* swiglu halves -> h (chunked layout, gpt-oss clamps and +1 linear bias) */
-static void swiglu_act(const float *h1, float *h) {
+static void swiglu_act(const float *h1, float *h, int n) {
 #if defined(__aarch64__)
     const float32x4_t lim = vdupq_n_f32(SWIGLU_LIMIT), nlim = vdupq_n_f32(-SWIGLU_LIMIT);
     const float32x4_t one = vdupq_n_f32(1.0f), nalpha = vdupq_n_f32(-SWIGLU_ALPHA);
-    for (int i = 0; i < FF; i += 4) {
+    for (int i = 0; i < n; i += 4) {
         float32x4_t glu = vminq_f32(vld1q_f32(h1 + i), lim);
-        float32x4_t lin = vminq_f32(vmaxq_f32(vld1q_f32(h1 + FF + i), nlim), lim);
+        float32x4_t lin = vminq_f32(vmaxq_f32(vld1q_f32(h1 + n + i), nlim), lim);
         float32x4_t sig = vdivq_f32(one, vaddq_f32(one, exp4(vmulq_f32(nalpha, glu))));
         vst1q_f32(h + i, vmulq_f32(vmulq_f32(glu, sig), vaddq_f32(lin, one)));
     }
 #else
-    for (int i = 0; i < FF; i++) {
-        float glu = h1[i], lin = h1[FF + i];
+    for (int i = 0; i < n; i++) {
+        float glu = h1[i], lin = h1[n + i];
         if (glu > SWIGLU_LIMIT) glu = SWIGLU_LIMIT;
         if (lin > SWIGLU_LIMIT) lin = SWIGLU_LIMIT;
         if (lin < -SWIGLU_LIMIT) lin = -SWIGLU_LIMIT;
@@ -1061,66 +1125,87 @@ static void swiglu_act(const float *h1, float *h) {
 #endif
 }
 
+/* --calib: fold one chunk's per-neuron importance into the global totals */
+static void calib_add(int e, const double *imp) {
+    pthread_mutex_lock(&g_calib_mu);
+    double *c = g_calib[R.layer][e];
+    for (int j = 0; j < FF; j++) c[j] += imp[j];
+    pthread_mutex_unlock(&g_calib_mu);
+}
+
 /* phase C: experts (parallel over experts, chained token lists) */
 #if defined(HAVE_BFDOT)
 static void moe_block(const bf16 *w1, const bf16 *b1, const bf16 *w2, const bf16 *b2,
-                      const int *blk, int m) {
+                      const int *blk, int m, int e) {
+    const int W = g_ff;
     float h1s[MOE_B][2 * FF], outs[MOE_B][D], h[FF];
     bf16 hhs[MOE_B][FF];
+    double imp[FF];
     const bf16 *xh[MOE_B]; float *yp[MOE_B];
+    if (g_calib) memset(imp, 0, sizeof imp);
     for (int i = 0; i < m; i++) {
         xh[i] = R.tbh + (size_t)(blk[i] / TOPK) * D;
         yp[i] = h1s[i];
-        cvt_bf16(b1, h1s[i], 2 * FF);
+        cvt_bf16(b1, h1s[i], 2 * W);
     }
-    moe_gemm(w1, xh, yp, m, D, 2 * FF);
+    moe_gemm(w1, xh, yp, m, D, 2 * W);
     for (int i = 0; i < m; i++) {
-        swiglu_act(h1s[i], h);
-        cvt_f32_bf16(h, hhs[i], FF);
+        swiglu_act(h1s[i], h, W);
+        if (g_calib) {
+            float gw = R.gates[blk[i]];
+            for (int j = 0; j < W; j++) imp[j] += gw * fabsf(h[j]);
+        }
+        cvt_f32_bf16(h, hhs[i], W);
         cvt_bf16(b2, outs[i], D);
         xh[i] = hhs[i]; yp[i] = outs[i];
     }
-    moe_gemm(w2, xh, yp, m, FF, D);
+    moe_gemm(w2, xh, yp, m, W, D);
     for (int i = 0; i < m; i++) {
         float gw = R.gates[blk[i]];
         float *o = R.moe + (size_t)blk[i] * D;
         for (int j = 0; j < D; j++) o[j] = outs[i][j] * gw;
     }
+    if (g_calib) calib_add(e, imp);
 }
 
 static void ph_c(void *ctx, size_t c) {
     (void)ctx;
     Layer *y = &M.L[R.layer];
-    size_t e = (size_t)R.wchunk[c].e;
-    moe_block(y->w1 + (size_t)e * D * 2 * FF, y->b1 + (size_t)e * 2 * FF,
-              y->w2 + (size_t)e * FF * D,     y->b2 + (size_t)e * D,
-              R.wlist + R.wchunk[c].off, R.wchunk[c].cnt);
+    size_t e = (size_t)R.wchunk[c].e, W = (size_t)g_ff;
+    moe_block(y->w1 + e * D * 2 * W, y->b1 + e * 2 * W,
+              y->w2 + e * W * D,     y->b2 + e * D,
+              R.wlist + R.wchunk[c].off, R.wchunk[c].cnt, (int)e);
 }
 #else
 static void ph_c(void *ctx, size_t c) {
     (void)ctx;
     Layer *y = &M.L[R.layer];
     size_t e = (size_t)R.wchunk[c].e;
-    const bf16 *w1 = y->w1 + (size_t)e * D * 2 * FF;
-    const bf16 *b1 = y->b1 + (size_t)e * 2 * FF;
-    const bf16 *w2 = y->w2 + (size_t)e * FF * D;
-    const bf16 *b2 = y->b2 + (size_t)e * D;
+    const int W = g_ff;
+    const bf16 *w1 = y->w1 + e * D * 2 * W;
+    const bf16 *b1 = y->b1 + e * 2 * W;
+    const bf16 *w2 = y->w2 + e * W * D;
+    const bf16 *b2 = y->b2 + e * D;
     float h1[2 * FF], h[FF];
+    double imp[FF];
+    if (g_calib) memset(imp, 0, sizeof imp);
     const int *blk = R.wlist + R.wchunk[c].off;
     for (int i2 = 0; i2 < R.wchunk[c].cnt; i2++) {
         int it = blk[i2], t = it / TOPK;
         const float *tb = R.tb + (size_t)t * D;
-        cvt_bf16(b1, h1, 2 * FF);
+        cvt_bf16(b1, h1, 2 * W);
         for (int i = 0; i < D; i += 8)
-            axpy8_bf16(tb + i, w1 + (size_t)i * 2 * FF, 2 * FF, h1, 2 * FF);
-        swiglu_act(h1, h);
+            axpy8_bf16(tb + i, w1 + (size_t)i * 2 * W, 2 * W, h1, 2 * W);
+        swiglu_act(h1, h, W);
+        float gw = R.gates[it];
+        if (g_calib) for (int j = 0; j < W; j++) imp[j] += gw * fabsf(h[j]);
         float *o = R.moe + (size_t)it * D;
         cvt_bf16(b2, o, D);
-        for (int i = 0; i < FF; i += 8)
+        for (int i = 0; i < W; i += 8)
             axpy8_bf16(h + i, w2 + (size_t)i * D, D, o, D);
-        float gw = R.gates[it];
         for (int i = 0; i < D; i++) o[i] *= gw;
     }
+    if (g_calib) calib_add((int)e, imp);
 }
 #endif
 
@@ -1844,7 +1929,7 @@ int main(int argc, char **argv) {
     const char *model_dir = getenv("PF_MODEL") ? getenv("PF_MODEL") : "model";
     int n_ctx = 4096, json = 0, use_argmax = 0, stats = 0, dump = 0;
     int lines = 0, batch_tok = 16384, serve_port = 0;
-    const char *file = NULL;
+    const char *file = NULL, *trim = NULL, *calib = NULL;
     char *text = NULL; size_t text_len = 0;
     for (int a = 1; a < argc; a++) {
         if (!strcmp(argv[a], "--model") && a + 1 < argc) model_dir = argv[++a];
@@ -1858,6 +1943,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[a], "--serve") && a + 1 < argc) serve_port = atoi(argv[++a]);
         else if (!strcmp(argv[a], "--linger") && a + 1 < argc) g_linger_us = atoi(argv[++a]) * 1000;
         else if (!strcmp(argv[a], "--skip-beta") && a + 1 < argc) g_skip_beta = (float)atof(argv[++a]);
+        else if (!strcmp(argv[a], "--trim") && a + 1 < argc) trim = argv[++a];
+        else if (!strcmp(argv[a], "--calib") && a + 1 < argc) calib = argv[++a];
         else if (!strcmp(argv[a], "--batch") && a + 1 < argc) batch_tok = atoi(argv[++a]);
         else if (!strcmp(argv[a], "-f") && a + 1 < argc) file = argv[++a];
         else {
@@ -1868,9 +1955,12 @@ int main(int argc, char **argv) {
             text_len += l; text[text_len] = 0;
         }
     }
+    if (trim && calib) die("--calib needs the full model (drop --trim)");
     if (serve_port) {
+        if (calib) die("--calib is not supported with --serve");
         tk_load(model_dir);
         model_load(model_dir);
+        if (trim) trim_load(trim);
         viterbi_init();
         engine_init(n_ctx, batch_tok);
         http_serve(serve_port, n_ctx, use_argmax);
@@ -1930,11 +2020,14 @@ int main(int argc, char **argv) {
         return 0;
     }
     model_load(model_dir);
+    if (trim) trim_load(trim);
+    if (calib && !(g_calib = calloc(NL, sizeof *g_calib))) die("out of memory");
     viterbi_init();
     double t1 = now_ms();
     engine_init(n_ctx, batch_tok);
     run_docs(docs, ndoc, n_ctx);
     double t2 = now_ms();
+    if (calib) calib_write(calib, total_tok);
 
     if (dump) {
         for (size_t dd = 0; dd < ndoc; dd++)

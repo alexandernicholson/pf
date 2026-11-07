@@ -81,6 +81,8 @@ python3 -c "import tiktoken,base64; e=tiktoken.get_encoding('o200k_base'); \
 ./pf --argmax              # per-token argmax instead of Viterbi
 ./pf --ctx N               # context window (default 4096, matching reference CPU)
 ./pf --stats               # timing breakdown on stderr
+./pf --trim trim/w480.mask # approximate: narrower experts, ~1.25x faster (see below)
+./pf --calib out.bin       # write per-neuron expert importance stats (for trim.py)
 PF_MODEL=/path/to/model    # checkpoint dir (default ./model)
 ```
 
@@ -137,7 +139,49 @@ verified under Rosetta 2). Threading uses libdispatch on macOS and a built-in
 pthread pool elsewhere; no other dependencies. Linux build:
 `cc -O3 -std=c11 -march=native -pthread -o pf pf.c -lm`
 
-## Approximate mode
+## Approximate modes
+
+### Expert width trimming
+
+`--trim MASK` keeps only the most important intermediate neurons of every
+expert and re-packs the expert weights densely at load, so every MoE GEMM
+shrinks by the same factor (experts are ~77% of the FLOPs). The shipped
+`trim/w480.mask` keeps 480 of 640 neurons per expert (75% of expert compute).
+
+Measured against the untrimmed model on an M4 Max (16 cores), held-out data:
+
+| Eval set | lines changed | span F1 vs untrimmed | char F1 vs gold, untrimmed → trimmed |
+|---|---:|---:|---|
+| 6k loghub lines, 12 systems | 13.7% | 0.880 | (no gold) |
+| 1k English, PII-Masking-300k | 5.2% | 0.991 | 0.926 → 0.926 |
+| 1.5k Japanese, openpii-1.5m ja + Sumi | 28.1% | 0.944 | 0.796 → 0.797 |
+
+Throughput on the log set is 5,182 → 6,491 tok/s (1.25×; experts phase
+1.34×). Changes are near-tie span flips, not lost coverage: accuracy against
+gold labels is unchanged, and on logs the trimmed model emits about as many
+spans as the full one (5,300 vs 5,249). Narrower masks trade more agreement
+for speed (width 320: 1.56×, 21% of log lines changed, ~8% fewer log spans;
+width 160: 2.2×). At equal speed, width trimming agreed with the full model
+far better than top-k reduction on every set; dropping whole experts gave no
+speedup at all (each token still runs four). Like `--skip-beta`, it is **not**
+output-preserving: validate on your own corpus before enabling.
+
+Build a mask for your own traffic (one stats file per language/domain;
+files are weighted equally; width must be a multiple of 8):
+
+```sh
+./pf --lines --calib en.bin   -f english.txt  > /dev/null
+./pf --lines --calib ja.bin   -f japanese.txt > /dev/null
+./pf --lines --calib logs.bin -f logs.txt     > /dev/null
+python3 trim.py my.mask 480 en.bin ja.bin logs.bin
+```
+
+Calibrate on every language you serve: a logs-only mask roughly doubled the
+Japanese disagreement in our tests. The shipped mask was calibrated on 6k
+loghub lines, 500 PII-Masking-300k English rows, and 1.3k Japanese texts
+(openpii-1.5m ja + Sumi train), disjoint from the eval sets above.
+
+### Expert skipping
 
 `--skip-beta B` enables dynamic expert skipping (Lu et al. 2024): expert
 slots whose routing weight is below `B x` the top slot's are dropped and the
