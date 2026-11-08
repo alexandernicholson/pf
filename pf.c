@@ -42,7 +42,7 @@
 #else
 #define DOT_X(xf, xh, w, n)            dot_bf16(xf, w, n)
 #define AXPY8_X(xf, xh, w, stride, y, n) axpy8_bf16(xf, w, stride, y, n)
-#define CVT_H(x, y, n)                 ((void)0)
+#define CVT_H(x, y, n)                 ((void)(y))
 #endif
 
 /* ------------------------------------------------------------------ config */
@@ -1817,7 +1817,7 @@ static void http_send(int fd, const char *status, const char *body, size_t blen)
     if (write(fd, body, blen) < 0) return;
 }
 
-static void http_handle(int fd, int n_ctx, int use_argmax) {
+static void http_handle(int fd, int use_argmax) {
     SB req = {0};
     size_t hdr_end = 0, body_len = 0;
     for (;;) {
@@ -1896,7 +1896,7 @@ static void *conn_main(void *arg) {
     int fd = (int)(intptr_t)arg;
     struct timeval tv = {30, 0};
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
-    http_handle(fd, g_nctx_srv, g_argmax_srv);
+    http_handle(fd, g_argmax_srv);
     close(fd);
     return NULL;
 }
