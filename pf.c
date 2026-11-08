@@ -844,7 +844,7 @@ static void unpin(const void *p, size_t n) {
 }
 
 #if defined(HAVE_SME)
-/* SME (used when sme2_usable(); --exact keeps the reference-identical BFDOT path):
+/* SME (used when sme2_usable(); --exact keeps the reference-matching BFDOT path):
  * re-pack expert weights k-pair interleaved (sme_gemm layout) once at load,
  * after --trim; the mmap'd originals are unpinned so RSS doesn't double. */
 static int g_sme;

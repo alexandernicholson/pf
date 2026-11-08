@@ -10,13 +10,14 @@ $ ./pf "Call Maya Chen at +1 (415) 555-0124 or maya@example.com"
 Call <PRIVATE_PERSON> at <PRIVATE_PHONE> or <PRIVATE_EMAIL>
 ```
 
-Output is byte-identical to the Python reference (`opf --device cpu`) on every
-input tested — including windowed long inputs — at ~1,650 tok/s warm on an M2
-Air (~65× the reference, ~166 GFLOPS sustained). On SME2 chips (Apple M4 and
-later, detected at run time) the default path runs the matmuls on the SME
-matrix engine instead, with int8 experts in layers 2-7 — ~8× faster on an M4
-Max, near-exact (see [SME2](#sme2-matrix-engine-m4-and-later)); `--exact`
-keeps the byte-identical path there.
+With `--exact`, output matches the Python reference (`opf --device cpu`) byte
+for byte on nearly every input tested (see [benchmarks](#benchmarks-vs-openais-bundled-tool)
+for the exceptions, which are no bigger than the reference's own drift between
+PyTorch versions), at ~1,650 tok/s warm on an M2 Air and ~5,200 tok/s on an M4
+Max. On SME2 chips (Apple M4 and later, detected at run time) the default path
+runs the matmuls on the SME matrix engine instead, with int8 experts in layers
+2-7 — ~7× faster again on an M4 Max, near-exact (see
+[SME2](#sme2-matrix-engine-m4-and-later)).
 
 ## What's inside (pf.c, ~1,300 lines)
 
@@ -39,11 +40,44 @@ keeps the byte-identical path there.
 
 ## Benchmarks vs OpenAI's bundled tool
 
-Same machine (MacBook Air M2, 8 cores, 24GB), same checkpoint, both on CPU,
-**byte-identical outputs**. "Reference" is the `opf` CLI / Python API from
-[openai/privacy-filter](https://github.com/openai/privacy-filter) at default
-settings (PyTorch CPU path, no `torch.compile`); `pf` timings include its
-mmap + page pre-touch load unless noted.
+Same machine (MacBook Pro M4 Max, 12P+4E cores, 128 GB), same checkpoint,
+both on CPU. "Reference" is the `opf` CLI / Python API from
+[openai/privacy-filter](https://github.com/openai/privacy-filter) (commit
+`f7f00ca`) at default settings: PyTorch 2.15.0 CPU path, 12 threads, no
+`torch.compile`. `pf` timings include its mmap + page pre-touch load unless
+noted; second of two runs. Inputs: one 105-token email, one 2,904-token
+document, and 150 short English documents (PII-Masking-300k rows, mean 113
+tokens).
+
+| Workload | reference `opf` | `pf --exact` | `pf` default (SME2 + int8) |
+|---|---|---|---|
+| One email (105 tok), end-to-end | 7.5 s | 0.58 s (13×) | 0.69 s (11×) |
+| One 2,904-token doc, end-to-end | 13.7 s | 1.15 s (12×) | 0.77 s (18×) |
+| Same doc, inference only | 11.9 s (244 tok/s) | 0.56 s (5,150 tok/s, 21×) | 0.08 s (36,000 tok/s, 148×) |
+| 150 short docs, one API call each (model preloaded) | 74.2 s (2.0 docs/s) | — | — |
+| 150 short docs, `pf --lines` (one packed forward), end-to-end | — | 3.8 s (40 docs/s, 20×) | 1.1 s (135 docs/s, 67×) |
+| 600 short docs via HTTP server, 32 concurrent clients | n/a (no server) | 43 docs/s | 310 docs/s |
+
+The default path loads ~0.1 s slower (weight re-packing and int8
+quantization), so it loses on a single short input.
+
+**Agreement with the reference.** `pf --exact` matches it on the email, the
+long document, and 147 of the 150 short documents. The reference itself is
+not a fixed target: run on PyTorch 2.12.1 (current when `pf` was first
+benchmarked) it disagrees with PyTorch 2.15.0 on 3 of the 150 documents and
+on the long one, and matches `pf --exact` on 148 of 150 plus the long
+document and the email. Every difference is a near-tie flip: one span's label
+(`<ACCOUNT_NUMBER>` vs `<PRIVATE_ADDRESS>`) or one character at a span edge.
+Only one document differs from both PyTorch versions. `pf` accumulates in
+fp32 over the same bf16 weights and rounds activations to bf16 at the same
+matmul inputs as the reference, but in a different summation order, so
+agreement is empirical, not guaranteed. `pf --exact` output is unchanged
+since the first commit. The default mode matches the reference on 145 of 150.
+
+### Original run (MacBook Air M2, 8 cores, 24 GB, July 2026)
+
+Reference on the PyTorch of the day; outputs matched on every input tested
+then.
 
 | Workload                                   | reference `opf` | `pf`            | speedup |
 |--------------------------------------------|-----------------|-----------------|--------:|
@@ -60,10 +94,9 @@ per-call overhead) against `pf`'s. Load alone: reference ≈ 6.5 s
 (torch import + module build) vs `pf` ≈ 0.25 s warm page cache / ~3 s cold.
 Forward-only throughput on long inputs is ~1,400–1,550 tok/s (~166 GFLOPS
 sustained; the MoE kernel runs at ~86 of a measured ~91 GMAC/s practical
-ceiling). Fanless M2 thermals add ±5% on sustained runs. The precision story:
-`pf` accumulates in fp32 over the same bf16 weights and rounds activations to
-bf16 at matmul inputs exactly where the reference does — Viterbi label
-streams, and therefore outputs, matched the reference on every input tested.
+ceiling). Fanless M2 thermals add ±5% on sustained runs. The short documents
+in this run were shorter than the M4 run's, so the docs/s rows don't compare
+across machines.
 
 ## Setup
 
@@ -88,7 +121,7 @@ python3 -c "import tiktoken,base64; e=tiktoken.get_encoding('o200k_base'); \
 ./pf --argmax              # per-token argmax instead of Viterbi
 ./pf --ctx N               # context window (default 4096, matching reference CPU)
 ./pf --stats               # timing breakdown on stderr
-./pf --exact               # on SME2 chips: keep the reference-identical BFDOT path
+./pf --exact               # on SME2 chips: keep the reference-matching BFDOT path
 ./pf --no-int8             # on SME2 chips: bf16 experts instead of int8 (see SME2)
 ./pf --int8                # elsewhere: opt in to approximate int8 experts
 ./pf --trim trim/w480.mask # approximate: narrower experts, ~1.2x faster (see below)
@@ -179,9 +212,9 @@ attention:
 | 1k English (112) | 1.06 → 0.72 s | 29,795 → 32,772 (1.10×) |
 | 1.5k Japanese (180) | 3.54 → 1.92 s | 26,734 → 32,453 (1.21×) |
 
-SME2 rounds differently from the reference (bias added after accumulation,
-different summation order, int8 experts), so it is near-exact rather than
-byte-identical. Against `--exact` on held-out sets:
+SME2 rounds differently from `--exact` (bias added after accumulation,
+different summation order, int8 experts), so it drifts further from the
+reference. Against `--exact` on held-out sets:
 
 | Eval set | lines changed, default (`--no-int8`) | span F1 vs exact | char F1 vs gold: exact / `--no-int8` / default |
 |---|---:|---:|---|
@@ -194,7 +227,7 @@ gold labels: of the 78 Japanese docs where int8 and `--no-int8` disagree, 31
 get closer to gold and 39 further (char F1 −0.0004, 95% bootstrap CI
 −0.0008 to +0.0001); `--no-int8` against `--exact` splits 31 / 21. The log
 set has no gold labels, so there only the agreement numbers are known. Use
-`--exact` when you need the reference's output byte for byte. `--calib`
+`--exact` when you need output as close to the reference as `pf` gets. `--calib`
 always runs bf16 experts; its stats agree with `--exact`'s to within the
 BFDOT-vs-NEON noise floor.
 
