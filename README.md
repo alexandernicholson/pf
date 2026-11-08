@@ -89,6 +89,7 @@ python3 -c "import tiktoken,base64; e=tiktoken.get_encoding('o200k_base'); \
 ./pf --stats               # timing breakdown on stderr
 ./pf --exact               # on SME2 chips: keep the reference-identical BFDOT path
 ./pf --trim trim/w480.mask # approximate: narrower experts, ~1.2x faster (see below)
+./pf --int8               # approximate: int8 experts in layers 2-7 (see below)
 ./pf --calib out.bin       # write per-neuron expert importance stats (for trim.py)
 PF_MODEL=/path/to/model    # checkpoint dir (default ./model)
 ```
@@ -135,15 +136,15 @@ solo-request latency pays only the linger. Adding a format = one row in the
 
 ## SME2 matrix engine (M4 and later)
 
-On chips with SME2 the expert GEMMs and the QKV / attention-output
-projections run as `BFMOPA` outer products (16 tokens × 64 outputs per pass,
-fp32 accumulation in ZA tiles). Weights are re-packed k-pair-interleaved at
-load (+0.15 s; the mmap'd originals are unpinned, so RSS doesn't double).
-Attention runs on SME too, in fp32 (`FMOPA`): per 16-query block and head,
-Sᵀ = K Qᵀ over the block's union key window, a masked softmax vectorized
-across the 16 queries on NEON (no `exp` in streaming mode), then O = P V.
-Norms, SwiGLU and the router stay on NEON/BFDOT. `--stats` prints which
-engine ran (`phases (sme2)` or `phases (vector)`).
+On chips with SME2 the expert GEMMs, the QKV / attention-output projections
+and the router run as `BFMOPA` outer products (16 tokens × 64 outputs per
+pass, fp32 accumulation in ZA tiles). Weights are re-packed
+k-pair-interleaved at load (+0.15 s; the mmap'd originals are unpinned, so
+RSS doesn't double). Attention runs on SME too, in fp32 (`FMOPA`): per
+16-query block and head, Sᵀ = K Qᵀ over the block's union key window, a
+masked softmax vectorized across the 16 queries on NEON (no `exp` in
+streaming mode), then O = P V. Norms, SwiGLU and top-k stay on NEON.
+`--stats` prints which engine ran (`phases (sme2)` or `phases (vector)`).
 
 Detection is at run time (`hw.optional.arm.FEAT_SME2` on macOS,
 `AT_HWCAP2` on Linux, plus a check for the 512-bit streaming vectors the tile
@@ -159,9 +160,11 @@ performance cluster); the expert GEMMs sustain ~3.8 inside `pf`. Measured on
 
 | Mode | norm+qkv | attn+router | experts | tok/s | lines/min |
 |---|---:|---:|---:|---:|---:|
-| `--exact` (BFDOT) | 6.2 s | 6.4 s | 44.5 s | 5,225 | 6,300 |
-| default (SME2) | 0.9 s | 1.7 s | 6.1 s | 34,152 | 41,100 |
-| SME2 + `--trim trim/w480.mask` | 0.9 s | 1.7 s | 4.6 s | 40,827 | 49,200 |
+| `--exact` (BFDOT) | 5.7 s | 6.0 s | 40.5 s | 5,717 | 6,900 |
+| default (SME2) | 0.9 s | 1.2 s | 6.0 s | 36,138 | 43,500 |
+| SME2 + `--trim trim/w480.mask` | 0.9 s | 1.2 s | 4.6 s | 43,676 | 52,600 |
+| SME2 + `--int8` | 0.9 s | 1.3 s | 4.1 s | 46,851 | 56,400 |
+| SME2 + `--int8 --trim trim/w480.mask` | 0.9 s | 1.3 s | 3.1 s | 55,243 | 66,500 |
 
 Attention on SME matters more as documents get longer (attention windows
 grow up to ±128 tokens); same machine, interleaved A/B against NEON
@@ -179,9 +182,9 @@ Against `--exact` on held-out sets:
 
 | Eval set | lines changed | span F1 vs exact | char F1 vs gold, exact → SME2 |
 |---|---:|---:|---|
-| 6k loghub lines | 1.6% | 0.988 | (no gold) |
-| 1k English, PII-Masking-300k | 0.4% | 0.999 | 0.926 → 0.926 |
-| 1.5k Japanese, openpii-1.5m ja + Sumi | 4.7% | 0.993 | 0.796 → 0.796 |
+| 6k loghub lines | 1.7% | 0.986 | (no gold) |
+| 1k English, PII-Masking-300k | 0.8% | 0.999 | 0.926 → 0.926 |
+| 1.5k Japanese, openpii-1.5m ja + Sumi | 4.0% | 0.994 | 0.796 → 0.797 |
 
 That is a fraction of `--trim`'s drift, with gold accuracy unchanged. Use
 `--exact` when you need the reference's output byte for byte. `--calib`
@@ -202,7 +205,11 @@ builds are verified under Rosetta 2). Threading uses libdispatch on macOS and
 a built-in pthread pool elsewhere; no other dependencies. Linux build:
 `cc -O3 -std=c11 -march=native -pthread -o pf pf.c -lm`. `-DPF_NO_SME` builds
 without the SME2 path. One binary for every BF16 Mac (M2 and later, SME2 on
-M4+): `make CFLAGS="-O3 -std=c11 -Wall -Wextra -mcpu=apple-m2"`.
+M4+): `make CFLAGS="-O3 -std=c11 -Wall -Wextra -mcpu=apple-m2"`. `--int8`
+works in every build: SME2 `SMOPA` on M4, NEON `SDOT` on any arm64 with the
+dot-product extension (M1 and later, Graviton 2+), plain C elsewhere. The
+three kernels accumulate in exact int32 and return identical results, so
+`--int8` output differs between builds only where their dense paths do.
 
 ## Approximate modes
 
@@ -222,7 +229,7 @@ Measured against the untrimmed model on an M4 Max (16 cores), held-out data:
 | 1.5k Japanese, openpii-1.5m ja + Sumi | 28.1% | 0.944 | 0.796 → 0.797 |
 
 Throughput on the log set is 5,182 → 6,491 tok/s on the `--exact` path
-(1.25×; experts phase 1.34×) and 34,152 → 40,827 tok/s with SME2 (1.20×).
+(1.25×; experts phase 1.34×) and 36,138 → 43,676 tok/s with SME2 (1.21×).
 Changes are near-tie span flips, not lost coverage: accuracy against
 gold labels is unchanged, and on logs the trimmed model emits about as many
 spans as the full one (5,300 vs 5,249). Narrower masks trade more agreement
@@ -246,6 +253,56 @@ Calibrate on every language you serve: a logs-only mask roughly doubled the
 Japanese disagreement in our tests. The shipped mask was calibrated on 6k
 loghub lines, 500 PII-Masking-300k English rows, and 1.3k Japanese texts
 (openpii-1.5m ja + Sumi train), disjoint from the eval sets above.
+
+### int8 experts
+
+`--int8` runs the expert GEMMs of layers 2-7 (75% of expert compute) in
+int8 with exact int32 accumulation: `SMOPA` on SME2, `SDOT` on NEON. Weights
+are quantized at load (no extra files, same load time), per output column;
+activations per row at run time, symmetric, scale max|v| / 127.
+
+Why int8, measured on an M4 Max (16 cores):
+
+| Engine | peak G(FL)OPS |
+|---|---:|
+| SME bf16 → fp32 (`BFMOPA`, today's default) | 4,800 |
+| SME fp32 / fp16 → fp32 | 4,800 |
+| SME int8 → int32 (`SMOPA`) | 9,700 |
+| NEON int8 `SDOT` / `SMMLA`, 12 P-cores | 5,700 |
+| NEON bf16 `BFDOT` / `BFMMLA`, 12 P-cores | 700 |
+
+int8 is the only format the SME units run faster than bf16. Running both
+engines at once peaked at 15.4 TOPS in a microbenchmark, but splitting
+expert blocks between SME and NEON workers inside `pf` was never faster than
+SME alone, so with SME2 every int8 GEMM goes to the SME units.
+
+Plain int8 moved too many outputs (5.7% of log lines, 13% of Japanese
+docs). Two changes bring it close to the bf16 SME path:
+
+- **Hadamard rotation.** Both GEMM inputs are multiplied by an orthonormal
+  Walsh-Hadamard transform along k first, and the weights by its transpose
+  at load (exact in real arithmetic). That spreads outlier channels: a
+  row's max/rms drops from 3.7-20 (expert input) and 10-17 (SwiGLU output) to
+  the Gaussian ~3.3, so the 127 levels cover the bulk of the values.
+- **Layers 0-1 stay bf16.** Quantizing layer 0 alone moves 3.4% of log
+  lines; layer 1, 2.4%; layers 4-7 change nothing measurable. Early-layer
+  error propagates through the rest of the network.
+
+Against `--exact` (default SME2 in parentheses):
+
+| Eval set | lines changed | span F1 vs exact | char F1 vs gold, exact → int8 |
+|---|---:|---:|---|
+| 6k loghub lines | 2.3% (1.7%) | 0.982 | (no gold) |
+| 1k English, PII-Masking-300k | 0.8% (0.8%) | 0.999 | 0.926 → 0.926 |
+| 1.5k Japanese, openpii-1.5m ja + Sumi | 5.7% (4.0%) | 0.991 | 0.796 → 0.796 |
+
+On the log set the experts phase drops from 6.0 to 4.1 s: 1.30× overall, or
+1.53× combined with `--trim` (whose drift dominates the combination). Peak
+RSS drops from 5.4 to 4.5 GB. Without SME2 (M4 with `-DPF_NO_SME` standing
+in for M1-M3 / Graviton) `--int8` takes 5,662 → 11,262 tok/s on logs, with
+1.4% of log lines changed, since the dense path stays reference-exact
+BFDOT. M1-M3 hardware itself is untested. Like the other modes here, it is
+**not** output-preserving.
 
 ### Expert skipping
 

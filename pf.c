@@ -36,6 +36,9 @@
 #define HAVE_SME 1
 #endif
 #endif
+#if defined(__ARM_FEATURE_DOTPROD)
+#define HAVE_SDOT 1                /* --int8 expert GEMMs on NEON SDOT */
+#endif
 #endif
 #if defined(HAVE_SME) && defined(__APPLE__)
 #include <sys/sysctl.h>
@@ -92,10 +95,12 @@
 #endif
 #define DB     16    /* tokens per SME block (dense projections, attention) */
 #define KW     (DB + 2 * BAND)   /* widest union key window of one SME block */
+#define Q8_FIRST 2   /* --int8 quantizes the experts of layers >= this (see q8_pack) */
 
 static float g_skip_beta = 0.0f;   /* --skip-beta: dynamic expert skipping */
 static int   g_ff = FF;            /* expert intermediate width; < FF after --trim */
 static double (*g_calib)[NE][FF];  /* --calib: per-neuron sum of gate * |swiglu out| */
+static int    g_q8;                /* --int8: int8 expert weights and activations */
 static pthread_mutex_t g_calib_mu = PTHREAD_MUTEX_INITIALIZER;
 static const char *CAT[NCAT] = {"account_number","private_address","private_date",
     "private_email","private_person","private_phone","private_url","secret"};
@@ -413,6 +418,46 @@ static void sme_gemm(const bf16 *xp, int MP, const bf16 *wp, float *y, int K, in
     }
 }
 
+/* int8 expert GEMM (--int8): y[MP][N] = x * W, int32 rows of stride N.
+ * x [K/4][MP][4], W [K/4][N][4]: one SMOPA consumes 16 tokens x 16 outputs x
+ * 4 k, exact int32 accumulation. Same tiling as sme_gemm. */
+__arm_locally_streaming __arm_new("za")
+static void sme_gemm_s8(const int8_t *xp, int MP, const int8_t *wp, int32_t *y, int K, int N) {
+    const svbool_t p8 = svptrue_b8(), p32 = svptrue_b32();
+    const svcount_t pc = svptrue_c8();
+    for (int t0 = 0; t0 < MP; t0 += 16) {
+        int n0 = 0;
+        for (; n0 + 64 <= N; n0 += 64) {
+            svzero_za();
+            const int8_t *a = xp + t0 * 4, *b = wp + n0 * 4;
+            for (int p = 0; p < K / 4; p++, a += MP * 4, b += N * 4) {
+                svint8_t va = svld1_s8(p8, a);
+                svint8x4_t vb = svld1_s8_x4(pc, b);
+                svmopa_za32_s8_m(0, p8, p8, va, svget4(vb, 0));
+                svmopa_za32_s8_m(1, p8, p8, va, svget4(vb, 1));
+                svmopa_za32_s8_m(2, p8, p8, va, svget4(vb, 2));
+                svmopa_za32_s8_m(3, p8, p8, va, svget4(vb, 3));
+            }
+            for (int r = 0; r < 16; r++) {
+                int32_t *o = y + (size_t)(t0 + r) * N + n0;
+                svst1_s32(p32, o,      svread_hor_za32_s32_m(svundef_s32(), p32, 0, r));
+                svst1_s32(p32, o + 16, svread_hor_za32_s32_m(svundef_s32(), p32, 1, r));
+                svst1_s32(p32, o + 32, svread_hor_za32_s32_m(svundef_s32(), p32, 2, r));
+                svst1_s32(p32, o + 48, svread_hor_za32_s32_m(svundef_s32(), p32, 3, r));
+            }
+        }
+        for (; n0 < N; n0 += 16) {
+            svzero_za();
+            const int8_t *a = xp + t0 * 4, *b = wp + n0 * 4;
+            for (int p = 0; p < K / 4; p++, a += MP * 4, b += N * 4)
+                svmopa_za32_s8_m(0, p8, p8, svld1_s8(p8, a), svld1_s8(p8, b));
+            for (int r = 0; r < 16; r++)
+                svst1_s32(p32, y + (size_t)(t0 + r) * N + n0,
+                          svread_hor_za32_s32_m(svundef_s32(), p32, 0, r));
+        }
+    }
+}
+
 /* fp32 FMOPA GEMM for attention (which stays fp32, like the reference):
  * y[MP][N] (row stride ldy) = sum_k a[k] (x) b[k]; row k of a (stride lda)
  * holds the MP output rows' k-th values, row k of b (stride ldb) the N
@@ -523,6 +568,45 @@ static void pack_rows(const bf16 *const *rows, int m, int MP, int n, bf16 *d) {
     }
 }
 #endif
+#endif
+
+/* int8 expert GEMM on the vector unit, same operands as sme_gemm_s8 (rows
+ * m..MP of x must be zero or are ignored; only rows < m are guaranteed). On
+ * NEON a 16-byte W load is 4 columns x 4 k: the SDOT-by-lane operand, with
+ * each lane of an x load one token's 4 k. 8 tokens x 8 columns per pass. */
+#if defined(HAVE_SDOT)
+static void gemm_s8_vec(const int8_t *xp, int MP, int m, const int8_t *wp, int32_t *y, int K, int N) {
+    for (int n0 = 0; n0 < N; n0 += 8)
+        for (int t0 = 0; t0 < m; t0 += 8) {
+            int32x4_t c[8][2];
+            for (int i = 0; i < 8; i++) c[i][0] = c[i][1] = vdupq_n_s32(0);
+            const int8_t *a = xp + t0 * 4, *b = wp + n0 * 4;
+            for (int p = 0; p < K / 4; p++, a += MP * 4, b += N * 4) {
+                const int8x16_t x0 = vld1q_s8(a), x1 = vld1q_s8(a + 16);
+                const int8x16_t w0 = vld1q_s8(b), w1 = vld1q_s8(b + 16);
+#define SD(i, x, l) c[i][0] = vdotq_laneq_s32(c[i][0], w0, x, l); \
+                    c[i][1] = vdotq_laneq_s32(c[i][1], w1, x, l);
+                SD(0, x0, 0) SD(1, x0, 1) SD(2, x0, 2) SD(3, x0, 3)
+                SD(4, x1, 0) SD(5, x1, 1) SD(6, x1, 2) SD(7, x1, 3)
+#undef SD
+            }
+            for (int i = 0; i < 8; i++) {
+                vst1q_s32(y + (size_t)(t0 + i) * N + n0,     c[i][0]);
+                vst1q_s32(y + (size_t)(t0 + i) * N + n0 + 4, c[i][1]);
+            }
+        }
+}
+#else
+static void gemm_s8_vec(const int8_t *xp, int MP, int m, const int8_t *wp, int32_t *y, int K, int N) {
+    for (int t = 0; t < m; t++)
+        for (int n = 0; n < N; n++) {
+            int32_t s = 0;
+            for (int p = 0; p < K / 4; p++)
+                for (int j = 0; j < 4; j++)
+                    s += xp[((size_t)p * MP + t) * 4 + j] * wp[((size_t)p * N + n) * 4 + j];
+            y[(size_t)t * N + n] = s;
+        }
+}
 #endif
 
 #if defined(CVT_BF16_AVX2)
@@ -672,7 +756,7 @@ typedef struct {
     bf16 *mlp_norm, *gate_w, *gate_b;
     bf16 *w1, *b1;                     /* [NE][D][2W], [NE][2W]  (W = g_ff) */
     bf16 *w2, *b2;                     /* [NE][W][D],  [NE][D]  */
-    bf16 *qkv_p, *out_p;               /* SME packings of qkv_w, attn_out_w */
+    bf16 *qkv_p, *out_p, *gate_p;      /* SME packings of qkv_w, attn_out_w, gate_w */
 } Layer;
 
 static struct {
@@ -753,6 +837,12 @@ static void trim_load(const char *path) {
     g_ff = (int)w;
 }
 
+static void unpin(const void *p, size_t n) {
+    uintptr_t pg = (uintptr_t)getpagesize();
+    uintptr_t a = ((uintptr_t)p + pg - 1) & ~(pg - 1), b = ((uintptr_t)p + n) & ~(pg - 1);
+    if (b > a) { munlock((void *)a, b - a); madvise((void *)a, b - a, MADV_DONTNEED); }
+}
+
 #if defined(HAVE_SME)
 /* SME (used when sme2_usable(); --exact keeps the reference-identical BFDOT path):
  * re-pack expert weights k-pair interleaved (sme_gemm layout) once at load,
@@ -767,26 +857,24 @@ static void pack_expert(void *ctx, size_t i) {
     pack_kpairs(y->w1 + e * D * 2 * W, g_pk[l][0] + e * D * 2 * W, D, 2 * W);
     pack_kpairs(y->w2 + e * W * D,     g_pk[l][1] + e * W * D,     W, D);
 }
-static void unpin(const void *p, size_t n) {
-    uintptr_t pg = (uintptr_t)getpagesize();
-    uintptr_t a = ((uintptr_t)p + pg - 1) & ~(pg - 1), b = ((uintptr_t)p + n) & ~(pg - 1);
-    if (b > a) { munlock((void *)a, b - a); madvise((void *)a, b - a, MADV_DONTNEED); }
-}
 static void sme_pack(void) {
     if (!sme2_usable()) return;
     const size_t W = (size_t)g_ff;
-    for (int l = 0; l < NL; l++)
+    const int nl = g_q8 ? Q8_FIRST : NL;   /* --int8 replaced the later experts */
+    for (int l = 0; l < nl; l++)
         if (!(g_pk[l][0] = malloc(NE * D * 2 * W * 2)) || !(g_pk[l][1] = malloc(NE * W * D * 2)))
             die("out of memory");
-    pfor((size_t)NL * NE, pack_expert, NULL);
+    pfor((size_t)nl * NE, pack_expert, NULL);
     for (int l = 0; l < NL; l++) {     /* dense projections, stored [out][in] */
         Layer *y = &M.L[l];
-        if (!(y->qkv_p = malloc((size_t)QKVD * D * 2)) || !(y->out_p = malloc((size_t)D * QD * 2)))
+        if (!(y->qkv_p = malloc((size_t)QKVD * D * 2)) || !(y->out_p = malloc((size_t)D * QD * 2)) ||
+            !(y->gate_p = malloc((size_t)NE * D * 2)))
             die("out of memory");
         pack_omajor(y->qkv_w, QKVD, D, y->qkv_p);
         pack_omajor(y->attn_out_w, D, QD, y->out_p);
+        pack_omajor(y->gate_w, NE, D, y->gate_p);
     }
-    for (int l = 0; l < NL; l++) {
+    for (int l = 0; l < nl; l++) {
         Layer *y = &M.L[l];
         if (W != FF) { free(y->w1); free(y->w2); }   /* trim_load's copies */
         else { unpin(y->w1, NE * D * 2 * W * 2); unpin(y->w2, NE * W * D * 2); }
@@ -799,9 +887,126 @@ static void sme_pack(void) {
 #define g_sme 0
 #endif
 
+/* --int8 (layers >= Q8_FIRST): expert GEMMs in int8 with exact int32
+ * accumulation. Both GEMM inputs are first rotated by an orthonormal
+ * Walsh-Hadamard transform H along k (x W = (x H)(H W), H = H^T; the weight
+ * side is folded in at load), which spreads outlier channels so max/rms of
+ * a row drops to the Gaussian ~3.3 (from 4-20 for x, 11-17 for the SwiGLU
+ * output). Then symmetric int8: weights per output column, activations per
+ * row, scale max|v| / 127. Weights are stored [K/4][N][4] for sme_gemm_s8 /
+ * gemm_s8_vec; both kernels give identical results. Layers 0-1 stay bf16:
+ * quantizing either one alone moves the output 3-10x more than any later
+ * layer does. */
+static int8_t *g_w8[NL][2];
+static float  *g_s8[NL][2];
+/* in-place orthonormal Walsh-Hadamard transform on blocks of the largest
+ * power of two (<= 128) dividing n: n rows of stride s, cols columns each */
+static int had_blk(int n) { int b = n & -n; return b > 128 ? 128 : b; }
+static void fwht(float *x, int n, size_t s, int cols) {
+    const int B = had_blk(n);
+    const float sc = 1.0f / sqrtf((float)B);
+    for (int o = 0; o < n; o += B)
+        for (int len = 1; len < B; len <<= 1)
+            for (int i = o; i < o + B; i += 2 * len)
+                for (int j = i; j < i + len; j++) {
+                    float *a = x + (size_t)j * s, *b = x + (size_t)(j + len) * s;
+                    for (int c = 0; c < cols; c++) { float u = a[c], v = b[c]; a[c] = u + v; b[c] = u - v; }
+                }
+    for (int j = 0; j < n; j++)
+        for (int c = 0; c < cols; c++) x[(size_t)j * s + c] *= sc;
+}
+/* fwht of one contiguous row (n % 8 == 0): butterflies of span 1 and 2 inside
+ * each 4-lane vector, wider spans between vectors */
+static void fwht_row(float *x, int n) {
+#if defined(__aarch64__)
+    const int B = had_blk(n);
+    for (int i = 0; i < n; i += 4) {
+        float32x4_t v = vld1q_f32(x + i), r = vrev64q_f32(v);
+        v = vtrn1q_f32(vaddq_f32(v, r), vsubq_f32(v, r));          /* span 1 */
+        float32x4_t w = vextq_f32(v, v, 2);
+        vst1q_f32(x + i, vcombine_f32(vget_low_f32(vaddq_f32(v, w)),
+                                      vget_low_f32(vsubq_f32(v, w)))); /* span 2 */
+    }
+    for (int len = 4; len < B; len <<= 1)
+        for (int o = 0; o < n; o += 2 * len)
+            for (int j = o; j < o + len; j += 4) {
+                float32x4_t a = vld1q_f32(x + j), b = vld1q_f32(x + j + len);
+                vst1q_f32(x + j, vaddq_f32(a, b));
+                vst1q_f32(x + j + len, vsubq_f32(a, b));
+            }
+    const float32x4_t sc = vdupq_n_f32(1.0f / sqrtf((float)B));
+    for (int i = 0; i < n; i += 4) vst1q_f32(x + i, vmulq_f32(vld1q_f32(x + i), sc));
+#else
+    fwht(x, n, 1, 1);
+#endif
+}
+static void q8_mat(const bf16 *w, int K, int N, int8_t *d, float *s) {   /* w [K][N] */
+    float mx[2 * FF] = {0};
+    float *f = malloc((size_t)K * N * 4);
+    if (!f) die("out of memory");
+    for (size_t i = 0; i < (size_t)K * N; i++) f[i] = b2f(w[i]);
+    fwht(f, K, (size_t)N, N);
+    for (int k = 0; k < K; k++)
+        for (int n = 0; n < N; n++) mx[n] = fmaxf(mx[n], fabsf(f[(size_t)k * N + n]));
+    for (int n = 0; n < N; n++) s[n] = mx[n] > 0 ? mx[n] / 127 : 1;
+    for (int k = 0; k < K; k++)
+        for (int n = 0; n < N; n++)
+            d[((size_t)(k / 4) * N + n) * 4 + k % 4] = (int8_t)lrintf(f[(size_t)k * N + n] / s[n]);
+    free(f);
+}
+static void q8_expert(void *ctx, size_t i) {
+    (void)ctx;
+    const int l = Q8_FIRST + (int)(i / NE), W = g_ff;
+    const size_t e = i % NE;
+    const Layer *y = &M.L[l];
+    q8_mat(y->w1 + e * D * 2 * W, D, 2 * W, g_w8[l][0] + e * D * 2 * W, g_s8[l][0] + e * 2 * W);
+    q8_mat(y->w2 + e * W * D,     W, D,     g_w8[l][1] + e * W * D,     g_s8[l][1] + e * D);
+}
+static void q8_pack(void) {
+    const size_t W = (size_t)g_ff;
+    for (int l = Q8_FIRST; l < NL; l++)
+        if (!(g_w8[l][0] = malloc(NE * D * 2 * W)) || !(g_w8[l][1] = malloc(NE * W * D)) ||
+            !(g_s8[l][0] = malloc(NE * 2 * W * 4)) || !(g_s8[l][1] = malloc(NE * D * 4)))
+            die("out of memory");
+    pfor((size_t)(NL - Q8_FIRST) * NE, q8_expert, NULL);
+    for (int l = Q8_FIRST; l < NL; l++) {
+        Layer *y = &M.L[l];
+        if (W != FF) { free(y->w1); free(y->w2); }   /* trim_load's copies */
+        else { unpin(y->w1, NE * D * 2 * W * 2); unpin(y->w2, NE * W * D * 2); }
+        y->w1 = y->w2 = NULL;
+    }
+}
+static void gemm_s8(const int8_t *xp, int MP, int m, const int8_t *wp, int32_t *y, int K, int N) {
+#if defined(HAVE_SME)
+    if (g_sme) { sme_gemm_s8(xp, MP, wp, y, K, N); return; }
+#endif
+    gemm_s8_vec(xp, MP, m, wp, y, K, N);
+}
+/* symmetric per-row int8 (n % 8 == 0): q = round(x * 127 / max|x|), *s = max|x| / 127 */
+static void q8_row(const float *x, int n, int8_t *q, float *s) {
+#if defined(__aarch64__)
+    float32x4_t vm = vdupq_n_f32(0);
+    for (int i = 0; i < n; i += 4) vm = vmaxq_f32(vm, vabsq_f32(vld1q_f32(x + i)));
+    const float mx = vmaxvq_f32(vm);
+    const float32x4_t inv = vdupq_n_f32(mx > 0 ? 127.0f / mx : 0.0f);
+    for (int i = 0; i < n; i += 8) {       /* round to nearest even, like rintf */
+        int32x4_t a = vcvtnq_s32_f32(vmulq_f32(vld1q_f32(x + i), inv));
+        int32x4_t b = vcvtnq_s32_f32(vmulq_f32(vld1q_f32(x + i + 4), inv));
+        vst1_s8(q + i, vqmovn_s16(vcombine_s16(vqmovn_s32(a), vqmovn_s32(b))));
+    }
+#else
+    float mx = 0;
+    for (int i = 0; i < n; i++) mx = fmaxf(mx, fabsf(x[i]));
+    const float inv = mx > 0 ? 127.0f / mx : 0.0f;
+    for (int i = 0; i < n; i++) q[i] = (int8_t)(int32_t)rintf(x[i] * inv);
+#endif
+    *s = mx / 127.0f;
+}
+
 /* --calib: per-neuron importance E[gate * |h_j|] * ||W2 row j||, normalized per
  * token so stats from several corpora can be summed with equal weight (trim.py).
- * A tiny ||W2|| term breaks ties for neurons the corpus never reached. */
+ * A tiny ||W2|| term breaks ties for neurons the corpus never reached. Needs
+ * the bf16 experts: main rejects --calib with --trim or --int8. */
 static void calib_write(const char *path, size_t ntok) {
     FILE *f = fopen(path, "wb");
     if (!f) die("cannot write --calib stats");
@@ -1147,6 +1352,7 @@ static struct {
     float *x;              /* [T][D] residual  */
     float *tb;             /* [T][D] normed    */
     bf16  *tbh;            /* [T][D] normed, bf16 */
+    int8_t *xq; float *xs; /* --int8: [T][D] tb quantized per token, [T] scales */
     float *q;              /* [T][QD]          */
     float *k, *v;          /* [T][KVD]         */
     float *ao;             /* [T][QD]          */
@@ -1178,6 +1384,8 @@ static void buf_alloc(int T) {
         R.ktld = T + KW;
         if (!(R.kt = calloc((size_t)KVD * R.ktld, 4))) die("out of memory");
     }
+    if (g_q8 && (!(R.xq = malloc((size_t)T * D)) || !(R.xs = malloc((size_t)T * 4))))
+        die("out of memory");
     R.lp  = malloc((size_t)T * NC * 4);
     R.bucket = malloc(NE * 4); R.chain = malloc((size_t)T * TOPK * 4);
     R.wlist = malloc((size_t)T * TOPK * 4);
@@ -1343,16 +1551,19 @@ static void b_attn(size_t t) {     /* banded attention -> R.ao */
 #endif
     }
 }
-static void b_post(size_t t) {     /* mlp norm + router + top-k gates */
+static void b_norm(size_t t) {     /* mlp norm (+ --int8 rotated quantized copy) */
     Layer *y = &M.L[R.layer];
-    float *x = R.x + t * D;
     float *tb = R.tb + t * D;
-    bf16 *th = R.tbh + t * D;
-    rms_norm(x, y->mlp_norm, tb);
-    CVT_H(tb, th, D);
-    float g[NE];
-    for (int e = 0; e < NE; e++)
-        g[e] = DOT_X(tb, th, y->gate_w + (size_t)e * D, D) + b2f(y->gate_b[e]);
+    rms_norm(R.x + t * D, y->mlp_norm, tb);
+    CVT_H(tb, R.tbh + t * D, D);
+    if (g_q8 && R.layer >= Q8_FIRST) {   /* rotated copy: the router reads tb as is */
+        float xr[D];
+        memcpy(xr, tb, sizeof xr);
+        fwht_row(xr, D);
+        q8_row(xr, D, R.xq + t * D, R.xs + t);
+    }
+}
+static void b_route(size_t t, float *g) {   /* router logits g[NE] -> top-k gates */
     int   *ei = R.eidx + t * TOPK;
     float *gw = R.gates + t * TOPK;
     for (int s = 0; s < TOPK; s++) {
@@ -1379,6 +1590,17 @@ static void b_post(size_t t) {     /* mlp norm + router + top-k gates */
         }
         for (int s = 0; s < keep; s++) gw[s] /= kden;
     }
+}
+static void b_post(size_t t) {     /* mlp norm + router + top-k gates */
+    Layer *y = &M.L[R.layer];
+    const float *tb = R.tb + t * D;
+    const bf16 *th = R.tbh + t * D;
+    (void)tb; (void)th;            /* DOT_X reads one of them, depending on the build */
+    b_norm(t);
+    float g[NE];
+    for (int e = 0; e < NE; e++)
+        g[e] = DOT_X(tb, th, y->gate_w + (size_t)e * D, D) + b2f(y->gate_b[e]);
+    b_route(t, g);
 }
 static void ph_b(void *ctx, size_t t) {
     (void)ctx;
@@ -1474,7 +1696,15 @@ static void ph_b_sme(void *ctx, size_t b) {
         float *x = R.x + (t0 + i) * D;
         const float *r = out + (size_t)i * D;
         for (int o = 0; o < D; o++) x[o] += r[o] + b2f(y->attn_out_b[o]);
-        b_post(t0 + i);
+        b_norm(t0 + i);
+        rows[i] = R.tbh + (t0 + i) * D;
+    }
+    pack_rows(rows, m, DB, D, xp);  /* router: [DB][D] x [D][NE] */
+    sme_gemm(xp, DB, y->gate_p, out, D, NE);
+    for (int i = 0; i < m; i++) {
+        float *g = out + (size_t)i * NE;
+        for (int e = 0; e < NE; e++) g[e] += b2f(y->gate_b[e]);
+        b_route(t0 + i, g);
     }
 }
 #endif
@@ -1510,8 +1740,50 @@ static void calib_add(int e, const double *imp) {
 }
 
 /* phase C: experts (parallel over experts, chained token lists) */
+#define MOE_BP ((MOE_B + 15) & ~15)   /* expert block rows, padded to the 16-row tile */
+/* --int8 expert block: m <= MOE_B (token, slot) items of expert e */
+static void moe_block_q8(int e, const int *blk, int m) {
+    const int l = R.layer, W = g_ff, MP = (m + 15) & ~15;
+    const Layer *y = &M.L[l];
+    const int8_t *w1 = g_w8[l][0] + (size_t)e * D * 2 * W, *w2 = g_w8[l][1] + (size_t)e * W * D;
+    const float *s1 = g_s8[l][0] + (size_t)e * 2 * W, *s2 = g_s8[l][1] + (size_t)e * D;
+    int32_t acc[MOE_BP * 2 * FF];
+    int8_t xp[MOE_BP * D] __attribute__((aligned(64)));   /* D == FF: either GEMM's input */
+    int8_t hq[FF];
+    float xs[MOE_BP], b1[2 * FF], b2[D], f[2 * FF], h[FF];
+    for (int i = 0; i < MP; i++) {     /* gather [D/4][MP][4]; pad rows zero */
+        const int8_t *src = i < m ? R.xq + (size_t)(blk[i] / TOPK) * D : NULL;
+        if (src) xs[i] = R.xs[blk[i] / TOPK];
+        for (int k = 0; k < D / 4; k++) {
+            if (src) memcpy(xp + ((size_t)k * MP + i) * 4, src + 4 * k, 4);
+            else memset(xp + ((size_t)k * MP + i) * 4, 0, 4);
+        }
+    }
+    gemm_s8(xp, MP, m, w1, acc, D, 2 * W);
+    cvt_bf16(y->b1 + (size_t)e * 2 * W, b1, 2 * W);
+    cvt_bf16(y->b2 + (size_t)e * D, b2, D);
+    for (int i = 0; i < m; i++) {
+        const int32_t *r = acc + (size_t)i * 2 * W;
+        for (int j = 0; j < 2 * W; j++) f[j] = (float)r[j] * (xs[i] * s1[j]) + b1[j];
+        swiglu_act(f, h, W);
+        fwht_row(h, W);
+        q8_row(h, W, hq, &xs[i]);      /* [W/4][MP][4]; pad rows still zero */
+        for (int k = 0; k < W / 4; k++) memcpy(xp + ((size_t)k * MP + i) * 4, hq + 4 * k, 4);
+    }
+    gemm_s8(xp, MP, m, w2, acc, W, D);
+    for (int i = 0; i < m; i++) {
+        const float gw = R.gates[blk[i]];
+        float *o = R.moe + (size_t)blk[i] * D;
+        const int32_t *r = acc + (size_t)i * D;
+        for (int j = 0; j < D; j++) o[j] = ((float)r[j] * (xs[i] * s2[j]) + b2[j]) * gw;
+    }
+}
+static void ph_c_q8(void *ctx, size_t c) {
+    (void)ctx;
+    moe_block_q8(R.wchunk[c].e, R.wlist + R.wchunk[c].off, R.wchunk[c].cnt);
+}
+
 #if defined(HAVE_SME)
-#define MOE_BP ((MOE_B + 15) & ~15)
 static void moe_block_sme(const bf16 *w1, const bf16 *b1, const bf16 *w2, const bf16 *b2,
                       const int *blk, int m, int e) {
     const int W = g_ff, MP = (m + 15) & ~15;
@@ -1703,7 +1975,7 @@ static void forward(const int32_t *ids, int T) {
                 R.wchunk[nc++] = (struct WChunk){e, start, w - start};
         }
         R.nchunk = nc;
-        pfor((size_t)nc, ph_c, NULL);
+        pfor((size_t)nc, g_q8 && l >= Q8_FIRST ? ph_c_q8 : ph_c, NULL);
         double u3 = now_ms();
         ph_ms[0] += u1 - u0; ph_ms[1] += u2 - u1; ph_ms[2] += u3 - u2;
     }
@@ -2369,6 +2641,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[a], "--trim") && a + 1 < argc) trim = argv[++a];
         else if (!strcmp(argv[a], "--calib") && a + 1 < argc) calib = argv[++a];
         else if (!strcmp(argv[a], "--exact")) exact = 1;
+        else if (!strcmp(argv[a], "--int8")) g_q8 = 1;
         else if (!strcmp(argv[a], "--batch") && a + 1 < argc) batch_tok = atoi(argv[++a]);
         else if (!strcmp(argv[a], "-f") && a + 1 < argc) file = argv[++a];
         else {
@@ -2380,11 +2653,13 @@ int main(int argc, char **argv) {
         }
     }
     if (trim && calib) die("--calib needs the full model (drop --trim)");
+    if (g_q8 && calib) die("--calib needs the bf16 experts (drop --int8)");
     if (serve_port) {
         if (calib) die("--calib is not supported with --serve");
         tk_load(model_dir);
         model_load(model_dir);
         if (trim) trim_load(trim);
+        if (g_q8) q8_pack();
         if (!exact) sme_pack();
         viterbi_init();
         engine_init(n_ctx, batch_tok);
@@ -2446,6 +2721,7 @@ int main(int argc, char **argv) {
     }
     model_load(model_dir);
     if (trim) trim_load(trim);
+    if (g_q8) q8_pack();
     if (!exact) sme_pack();
     if (calib && !(g_calib = calloc(NL, sizeof *g_calib))) die("out of memory");
     viterbi_init();
@@ -2469,8 +2745,8 @@ int main(int argc, char **argv) {
     double t3 = now_ms();
 
     if (stats) {
-        fprintf(stderr, "phases (%s): norm+qkv %.0fms | attn+router %.0fms | experts %.0fms | head %.0fms\n",
-                g_sme ? "sme2" : "vector", ph_ms[0], ph_ms[1], ph_ms[2], ph_ms[3]);
+        fprintf(stderr, "phases (%s%s): norm+qkv %.0fms | attn+router %.0fms | experts %.0fms | head %.0fms\n",
+                g_sme ? "sme2" : "vector", g_q8 ? ", int8 experts" : "", ph_ms[0], ph_ms[1], ph_ms[2], ph_ms[3]);
         fprintf(stderr,
                 "load+tokenize %.0fms | %zu docs, %zu tok, %d batches | forward %.0fms (%.1f tok/s) | decode %.1fms\n",
                 t1 - t0, ndoc, total_tok, g_nbatch, t2 - t1,
