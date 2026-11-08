@@ -13,9 +13,10 @@ Call <PRIVATE_PERSON> at <PRIVATE_PHONE> or <PRIVATE_EMAIL>
 Output is byte-identical to the Python reference (`opf --device cpu`) on every
 input tested — including windowed long inputs — at ~1,650 tok/s warm on an M2
 Air (~65× the reference, ~166 GFLOPS sustained). On SME2 chips (Apple M4 and
-later) the default path runs the matmuls on the SME matrix engine instead —
-~6× faster, near-exact (see [SME2](#sme2-matrix-engine-m4-and-later)); `--exact`
-keeps the byte-identical path there.
+later, detected at run time) the default path runs the matmuls on the SME
+matrix engine instead — ~6× faster, near-exact (see
+[SME2](#sme2-matrix-engine-m4-and-later)); `--exact` keeps the byte-identical
+path there.
 
 ## What's inside (pf.c, ~1,300 lines)
 
@@ -86,7 +87,7 @@ python3 -c "import tiktoken,base64; e=tiktoken.get_encoding('o200k_base'); \
 ./pf --argmax              # per-token argmax instead of Viterbi
 ./pf --ctx N               # context window (default 4096, matching reference CPU)
 ./pf --stats               # timing breakdown on stderr
-./pf --exact               # SME2 chips: keep the reference-identical BFDOT path
+./pf --exact               # on SME2 chips: keep the reference-identical BFDOT path
 ./pf --trim trim/w480.mask # approximate: narrower experts, ~1.2x faster (see below)
 ./pf --calib out.bin       # write per-neuron expert importance stats (for trim.py)
 PF_MODEL=/path/to/model    # checkpoint dir (default ./model)
@@ -138,7 +139,16 @@ On chips with SME2 the expert GEMMs and the QKV / attention-output
 projections run as `BFMOPA` outer products (16 tokens × 64 outputs per pass,
 fp32 accumulation in ZA tiles). Weights are re-packed k-pair-interleaved at
 load (+0.15 s; the mmap'd originals are unpinned, so RSS doesn't double);
-attention, norms, SwiGLU and the router stay on NEON/BFDOT.
+attention, norms, SwiGLU and the router stay on NEON/BFDOT. `--stats` prints
+which engine ran (`phases (sme2)` or `phases (vector)`).
+
+Detection is at run time (`hw.optional.arm.FEAT_SME2` on macOS,
+`AT_HWCAP2` on Linux, plus a check for the 512-bit streaming vectors the tile
+layout assumes), so one binary built on any BF16 Mac (M2 or later) uses SME2
+on an M4 and the BFDOT path elsewhere. clang builds the SME2 code into every
+such binary through a per-function target region; GCC only builds it when
+the whole target already has SME2 (its target pragma leaks SVE instructions
+into the rest of the file, which faults on CPUs without SVE).
 
 An M4 Max's SME units peak at ~4.1 TFLOPS bf16 in total (one per
 performance cluster); the expert GEMMs sustain ~3.8 inside `pf`. Measured on
@@ -166,10 +176,10 @@ stats agree with `--exact`'s to within the BFDOT-vs-NEON noise floor.
 
 ## Portability
 
-One small kernel interface, chosen at compile time:
+One small kernel interface, chosen at compile time, plus one run-time choice:
 
-- **SME2** — Apple M4 and later (`-mcpu=native` enables it); also builds the
-  BFDOT path, selected at run time with `--exact`
+- **SME2** — Apple M4 and later; built into every arm64 BF16 clang build and
+  used when the CPU supports it (`--exact` opts out)
 - **NEON + BFDOT** — Apple Silicon and AWS Graviton 3/4 (`-mcpu=native`)
 - **AVX2 + FMA** — Intel / AMD (`-mavx2 -mfma`), same shift-widen bf16 trick
 - **scalar C** — anything else
@@ -178,7 +188,8 @@ BFDOT, AVX2 and scalar produce byte-identical output (the AVX2 and scalar
 builds are verified under Rosetta 2). Threading uses libdispatch on macOS and
 a built-in pthread pool elsewhere; no other dependencies. Linux build:
 `cc -O3 -std=c11 -march=native -pthread -o pf pf.c -lm`. `-DPF_NO_SME` builds
-without the SME2 path.
+without the SME2 path. One binary for every BF16 Mac (M2 and later, SME2 on
+M4+): `make CFLAGS="-O3 -std=c11 -Wall -Wextra -mcpu=apple-m2"`.
 
 ## Approximate modes
 

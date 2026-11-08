@@ -28,9 +28,21 @@
 
 #if defined(__aarch64__)
 #include <arm_neon.h>
-#if defined(__ARM_FEATURE_SME2) && defined(__ARM_FEATURE_BF16) && !defined(PF_NO_BFDOT) && !defined(PF_NO_SME)
-#include <arm_sme.h>
+/* SME2 code is built when the target already has SME2, or on clang via a
+ * per-function target region (GCC's target pragma leaks SVE into the rest of
+ * the file); it is used only if the CPU and OS support it (sme2_usable). */
+#if defined(__ARM_FEATURE_BF16) && !defined(PF_NO_BFDOT) && !defined(PF_NO_SME) && defined(__has_include)
+#if __has_include(<arm_sme.h>) && (defined(__ARM_FEATURE_SME2) || defined(__clang__))
 #define HAVE_SME 1
+#endif
+#endif
+#endif
+#if defined(HAVE_SME) && defined(__APPLE__)
+#include <sys/sysctl.h>
+#elif defined(HAVE_SME) && defined(__linux__)
+#include <sys/auxv.h>
+#ifndef HWCAP2_SME2
+#define HWCAP2_SME2 (1UL << 37)
 #endif
 #endif
 #if defined(__APPLE__)
@@ -349,6 +361,13 @@ static void moe_gemm(const bf16 *w, const bf16 *const *xs, float *const *ys,
 }
 
 #if defined(HAVE_SME)
+/* clang target region: streaming-mode functions only, so no SVE reaches
+ * normal code (M4 has no non-streaming SVE) */
+#if !defined(__ARM_FEATURE_SME2)
+#pragma clang attribute push(__attribute__((target("sme2"))), apply_to = function)
+#endif
+#include <arm_sme.h>
+
 /* SME2 expert GEMM: y[MP][N] = x * W, fp32 rows of stride N.
  * x packed [K/2][MP][2], W packed [K/2][N][2] (k-pair interleaved bf16) so one
  * BFMOPA consumes 16 tokens x 16 outputs x 2 k. One token tile x four column
@@ -390,6 +409,24 @@ static void sme_gemm(const bf16 *xp, int MP, const bf16 *wp, float *y, int K, in
                           svread_hor_za32_f32_m(svundef_f32(), p32, 0, r));
         }
     }
+}
+
+__arm_locally_streaming static int sme_svl_words(void) { return (int)svcntsw(); }
+#if !defined(__ARM_FEATURE_SME2)
+#pragma clang attribute pop
+#endif
+
+/* run-time check: CPU + OS support SME2, with the 512-bit streaming vectors
+ * (16 fp32 lanes) that sme_gemm's tile layout assumes */
+static int sme2_usable(void) {
+    int hw = 0;
+#if defined(__APPLE__)
+    size_t n = sizeof hw;
+    if (sysctlbyname("hw.optional.arm.FEAT_SME2", &hw, &n, NULL, 0)) hw = 0;
+#elif defined(__linux__)
+    hw = (getauxval(AT_HWCAP2) & HWCAP2_SME2) != 0;
+#endif
+    return hw && sme_svl_words() == 16;
 }
 
 /* [K][N] -> [K/2][N][2]: rows 2p and 2p+1 interleaved per column */
@@ -642,7 +679,7 @@ static void trim_load(const char *path) {
 }
 
 #if defined(HAVE_SME)
-/* SME (default on SME2 builds; --exact keeps the reference-identical BFDOT path):
+/* SME (used when sme2_usable(); --exact keeps the reference-identical BFDOT path):
  * re-pack expert weights k-pair interleaved (sme_gemm layout) once at load,
  * after --trim; the mmap'd originals are unpinned so RSS doesn't double. */
 static int g_sme;
@@ -661,6 +698,7 @@ static void unpin(const void *p, size_t n) {
     if (b > a) { munlock((void *)a, b - a); madvise((void *)a, b - a, MADV_DONTNEED); }
 }
 static void sme_pack(void) {
+    if (!sme2_usable()) return;
     const size_t W = (size_t)g_ff;
     for (int l = 0; l < NL; l++)
         if (!(g_pk[l][0] = malloc(NE * D * 2 * W * 2)) || !(g_pk[l][1] = malloc(NE * W * D * 2)))
@@ -2295,8 +2333,8 @@ int main(int argc, char **argv) {
     double t3 = now_ms();
 
     if (stats) {
-        fprintf(stderr, "phases: norm+qkv %.0fms | attn+router %.0fms | experts %.0fms | head %.0fms\n",
-                ph_ms[0], ph_ms[1], ph_ms[2], ph_ms[3]);
+        fprintf(stderr, "phases (%s): norm+qkv %.0fms | attn+router %.0fms | experts %.0fms | head %.0fms\n",
+                g_sme ? "sme2" : "vector", ph_ms[0], ph_ms[1], ph_ms[2], ph_ms[3]);
         fprintf(stderr,
                 "load+tokenize %.0fms | %zu docs, %zu tok, %d batches | forward %.0fms (%.1f tok/s) | decode %.1fms\n",
                 t1 - t0, ndoc, total_tok, g_nbatch, t2 - t1,
