@@ -90,6 +90,8 @@
 #ifndef MOE_B
 #define MOE_B  16    /* tokens per expert block */
 #endif
+#define DB     16    /* tokens per SME block (dense projections, attention) */
+#define KW     (DB + 2 * BAND)   /* widest union key window of one SME block */
 
 static float g_skip_beta = 0.0f;   /* --skip-beta: dynamic expert skipping */
 static int   g_ff = FF;            /* expert intermediate width; < FF after --trim */
@@ -406,6 +408,68 @@ static void sme_gemm(const bf16 *xp, int MP, const bf16 *wp, float *y, int K, in
                                    svld1_bf16(pt, (const bfloat16_t *)b));
             for (int r = 0; r < 16; r++)
                 svst1_f32(p32, y + (size_t)(t0 + r) * N + n0,
+                          svread_hor_za32_f32_m(svundef_f32(), p32, 0, r));
+        }
+    }
+}
+
+/* fp32 FMOPA GEMM for attention (which stays fp32, like the reference):
+ * y[MP][N] (row stride ldy) = sum_k a[k] (x) b[k]; row k of a (stride lda)
+ * holds the MP output rows' k-th values, row k of b (stride ldb) the N
+ * columns'. MP % 16 == 0, N % 16 == 0. Four column tiles per pass when
+ * N >= 64, four row tiles when N == 16 (the K Q^T shape). */
+__arm_locally_streaming __arm_new("za")
+static void sme_gemm_f32(const float *a, int lda, int MP, const float *b, int ldb,
+                         float *y, int ldy, int K, int N) {
+    const svbool_t p32 = svptrue_b32();
+    const svcount_t pc = svptrue_c32();
+    int t0 = 0;
+    if (N == 16)
+        for (; t0 + 64 <= MP; t0 += 64) {
+            svzero_za();
+            for (int k = 0; k < K; k++) {
+                svfloat32x4_t va = svld1_f32_x4(pc, a + (size_t)k * lda + t0);
+                svfloat32_t vb = svld1_f32(p32, b + (size_t)k * ldb);
+                svmopa_za32_f32_m(0, p32, p32, svget4(va, 0), vb);
+                svmopa_za32_f32_m(1, p32, p32, svget4(va, 1), vb);
+                svmopa_za32_f32_m(2, p32, p32, svget4(va, 2), vb);
+                svmopa_za32_f32_m(3, p32, p32, svget4(va, 3), vb);
+            }
+            for (int r = 0; r < 16; r++) {
+                float *o = y + (size_t)(t0 + r) * ldy;
+                svst1_f32(p32, o,            svread_hor_za32_f32_m(svundef_f32(), p32, 0, r));
+                svst1_f32(p32, o + 16 * ldy, svread_hor_za32_f32_m(svundef_f32(), p32, 1, r));
+                svst1_f32(p32, o + 32 * ldy, svread_hor_za32_f32_m(svundef_f32(), p32, 2, r));
+                svst1_f32(p32, o + 48 * ldy, svread_hor_za32_f32_m(svundef_f32(), p32, 3, r));
+            }
+        }
+    for (; t0 < MP; t0 += 16) {
+        int n0 = 0;
+        for (; n0 + 64 <= N; n0 += 64) {
+            svzero_za();
+            for (int k = 0; k < K; k++) {
+                svfloat32_t va = svld1_f32(p32, a + (size_t)k * lda + t0);
+                svfloat32x4_t vb = svld1_f32_x4(pc, b + (size_t)k * ldb + n0);
+                svmopa_za32_f32_m(0, p32, p32, va, svget4(vb, 0));
+                svmopa_za32_f32_m(1, p32, p32, va, svget4(vb, 1));
+                svmopa_za32_f32_m(2, p32, p32, va, svget4(vb, 2));
+                svmopa_za32_f32_m(3, p32, p32, va, svget4(vb, 3));
+            }
+            for (int r = 0; r < 16; r++) {
+                float *o = y + (size_t)(t0 + r) * ldy + n0;
+                svst1_f32(p32, o,      svread_hor_za32_f32_m(svundef_f32(), p32, 0, r));
+                svst1_f32(p32, o + 16, svread_hor_za32_f32_m(svundef_f32(), p32, 1, r));
+                svst1_f32(p32, o + 32, svread_hor_za32_f32_m(svundef_f32(), p32, 2, r));
+                svst1_f32(p32, o + 48, svread_hor_za32_f32_m(svundef_f32(), p32, 3, r));
+            }
+        }
+        for (; n0 < N; n0 += 16) {
+            svzero_za();
+            for (int k = 0; k < K; k++)
+                svmopa_za32_f32_m(0, p32, p32, svld1_f32(p32, a + (size_t)k * lda + t0),
+                                  svld1_f32(p32, b + (size_t)k * ldb + n0));
+            for (int r = 0; r < 16; r++)
+                svst1_f32(p32, y + (size_t)(t0 + r) * ldy + n0,
                           svread_hor_za32_f32_m(svundef_f32(), p32, 0, r));
         }
     }
@@ -1086,6 +1150,7 @@ static struct {
     float *q;              /* [T][QD]          */
     float *k, *v;          /* [T][KVD]         */
     float *ao;             /* [T][QD]          */
+    float *kt; int ktld;   /* SME: [KVD][ktld] k transposed (ph_a_sme), ktld = T + KW */
     float *rc, *rs;        /* [T][HD/2] rope   */
     float *gates;          /* [T][TOPK]        */
     int   *eidx;           /* [T][TOPK]        */
@@ -1109,6 +1174,10 @@ static void buf_alloc(int T) {
     R.rc = malloc((size_t)T * HD / 2 * 4); R.rs = malloc((size_t)T * HD / 2 * 4);
     R.gates = malloc((size_t)T * TOPK * 4); R.eidx = malloc((size_t)T * TOPK * 4);
     R.moe = malloc((size_t)T * TOPK * D * 4);
+    if (g_sme) {           /* zero tail: attention reads up to KW past the batch end */
+        R.ktld = T + KW;
+        if (!(R.kt = calloc((size_t)KVD * R.ktld, 4))) die("out of memory");
+    }
     R.lp  = malloc((size_t)T * NC * 4);
     R.bucket = malloc(NE * 4); R.chain = malloc((size_t)T * TOPK * 4);
     R.wlist = malloc((size_t)T * TOPK * 4);
@@ -1196,7 +1265,6 @@ static void ph_a(void *ctx, size_t t) {
     a_post(t);
 }
 #if defined(HAVE_SME)
-#define DB 16                      /* tokens per SME dense-projection block */
 static void ph_a_sme(void *ctx, size_t b) {
     (void)ctx;
     Layer *y = &M.L[R.layer];
@@ -1216,6 +1284,7 @@ static void ph_a_sme(void *ctx, size_t b) {
         for (int o = 0; o < KVD; o++) k[o] = r[QD + o] + b2f(y->qkv_b[QD + o]);
         for (int o = 0; o < KVD; o++) v[o] = r[QD + KVD + o] + b2f(y->qkv_b[QD + KVD + o]);
         a_post(t);
+        for (int c = 0; c < KVD; c++) R.kt[(size_t)c * R.ktld + t] = k[c];   /* for attn_sme */
     }
 }
 #endif
@@ -1324,6 +1393,68 @@ static void ph_b(void *ctx, size_t t) {
     b_post(t);
 }
 #if defined(HAVE_SME)
+/* SME attention for m <= DB query tokens t0..: per head, the block's union key
+ * window [kmin, kmax] (packed segments may straddle a block) is scored as
+ * S^T = K Q^T, one row per key and one lane per query token, so the masked
+ * softmax (band + segment) vectorizes across tokens on NEON (streaming mode
+ * has no NEON) and leaves P^T in the layout O = P V consumes. K^T comes
+ * pre-transposed from ph_a_sme. fp32 throughout. */
+static void attn_sme(size_t t0, int m) {
+    int32_t lo[DB], hi[DB];
+    int kmin = R.T, kmax = -1;
+    for (int i = 0; i < DB; i++) {
+        if (i >= m) { lo[i] = INT32_MAX; hi[i] = INT32_MIN; continue; }   /* no keys */
+        const int t = (int)t0 + i;
+        int j0 = t - BAND, j1 = t + BAND;
+        if (j0 < R.sst[t]) j0 = R.sst[t];
+        if (j1 >= R.sen[t]) j1 = R.sen[t] - 1;
+        lo[i] = j0; hi[i] = j1;
+        if (j0 < kmin) kmin = j0;
+        if (j1 > kmax) kmax = j1;
+    }
+    const int nk = kmax - kmin + 1, nkp = (nk + 15) & ~15;
+    float qt[HD * DB], st[KW * DB], o[DB * HD], dn[DB];
+    const float *sinks = M.L[R.layer].sinks;
+    int32x4_t vlo[DB / 4], vhi[DB / 4];
+    for (int q = 0; q < DB / 4; q++) { vlo[q] = vld1q_s32(lo + 4 * q); vhi[q] = vld1q_s32(hi + 4 * q); }
+    const float32x4_t ninf = vdupq_n_f32(-INFINITY), zero = vdupq_n_f32(0);
+    for (int h = 0; h < NH; h++) {
+        const int g = h / (NH / NKV);
+        for (int d = 0; d < HD; d++)
+            for (int i = 0; i < DB; i++)
+                qt[d * DB + i] = i < m ? R.q[(t0 + i) * QD + h * HD + d] : 0.0f;
+        sme_gemm_f32(R.kt + (size_t)g * HD * R.ktld + kmin, R.ktld, nkp, qt, DB, st, DB, HD, DB);
+        const float32x4_t sink = vdupq_n_f32(sinks[h] * (float)M_LN2);
+        float32x4_t mx[DB / 4], den[DB / 4];
+        for (int q = 0; q < DB / 4; q++) mx[q] = sink;
+        for (int j = 0; j < nk; j++) {
+            const int32x4_t kj = vdupq_n_s32(kmin + j);
+            for (int q = 0; q < DB / 4; q++) {
+                uint32x4_t ok = vandq_u32(vcgeq_s32(kj, vlo[q]), vcleq_s32(kj, vhi[q]));
+                mx[q] = vmaxq_f32(mx[q], vbslq_f32(ok, vld1q_f32(st + j * DB + 4 * q), ninf));
+            }
+        }
+        for (int q = 0; q < DB / 4; q++) den[q] = exp4(vsubq_f32(sink, mx[q]));
+        for (int j = 0; j < nk; j++) {
+            const int32x4_t kj = vdupq_n_s32(kmin + j);
+            for (int q = 0; q < DB / 4; q++) {
+                uint32x4_t ok = vandq_u32(vcgeq_s32(kj, vlo[q]), vcleq_s32(kj, vhi[q]));
+                float *sp = st + j * DB + 4 * q;
+                float32x4_t e = vbslq_f32(ok, exp4(vsubq_f32(vld1q_f32(sp), mx[q])), zero);
+                vst1q_f32(sp, e);
+                den[q] = vaddq_f32(den[q], e);
+            }
+        }
+        for (int q = 0; q < DB / 4; q++) vst1q_f32(dn + 4 * q, den[q]);
+        sme_gemm_f32(st, DB, DB, R.v + (size_t)kmin * KVD + g * HD, KVD, o, HD, nk, HD);
+        for (int i = 0; i < m; i++) {
+            const float inv = 1.0f / dn[i];
+            float *dst = R.ao + (t0 + i) * QD + h * HD;
+            for (int d = 0; d < HD; d++) dst[d] = o[i * HD + d] * inv;
+        }
+    }
+}
+
 static void ph_b_sme(void *ctx, size_t b) {
     (void)ctx;
     Layer *y = &M.L[R.layer];
@@ -1332,8 +1463,8 @@ static void ph_b_sme(void *ctx, size_t b) {
     bf16 xp[DB * QD], hb[DB][QD];
     float out[DB * D];
     const bf16 *rows[DB] = {0};
+    attn_sme(t0, m);
     for (int i = 0; i < m; i++) {
-        b_attn(t0 + i);
         cvt_f32_bf16(R.ao + (t0 + i) * QD, hb[i], QD);
         rows[i] = hb[i];
     }

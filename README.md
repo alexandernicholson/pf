@@ -138,9 +138,12 @@ solo-request latency pays only the linger. Adding a format = one row in the
 On chips with SME2 the expert GEMMs and the QKV / attention-output
 projections run as `BFMOPA` outer products (16 tokens × 64 outputs per pass,
 fp32 accumulation in ZA tiles). Weights are re-packed k-pair-interleaved at
-load (+0.15 s; the mmap'd originals are unpinned, so RSS doesn't double);
-attention, norms, SwiGLU and the router stay on NEON/BFDOT. `--stats` prints
-which engine ran (`phases (sme2)` or `phases (vector)`).
+load (+0.15 s; the mmap'd originals are unpinned, so RSS doesn't double).
+Attention runs on SME too, in fp32 (`FMOPA`): per 16-query block and head,
+Sᵀ = K Qᵀ over the block's union key window, a masked softmax vectorized
+across the 16 queries on NEON (no `exp` in streaming mode), then O = P V.
+Norms, SwiGLU and the router stay on NEON/BFDOT. `--stats` prints which
+engine ran (`phases (sme2)` or `phases (vector)`).
 
 Detection is at run time (`hw.optional.arm.FEAT_SME2` on macOS,
 `AT_HWCAP2` on Linux, plus a check for the 512-bit streaming vectors the tile
@@ -157,8 +160,18 @@ performance cluster); the expert GEMMs sustain ~3.8 inside `pf`. Measured on
 | Mode | norm+qkv | attn+router | experts | tok/s | lines/min |
 |---|---:|---:|---:|---:|---:|
 | `--exact` (BFDOT) | 6.2 s | 6.4 s | 44.5 s | 5,225 | 6,300 |
-| default (SME2) | 0.9 s | 1.8 s | 6.1 s | 33,382 | 40,200 |
-| SME2 + `--trim trim/w480.mask` | 0.9 s | 1.8 s | 4.7 s | 39,736 | 47,900 |
+| default (SME2) | 0.9 s | 1.7 s | 6.1 s | 34,152 | 41,100 |
+| SME2 + `--trim trim/w480.mask` | 0.9 s | 1.7 s | 4.6 s | 40,827 | 49,200 |
+
+Attention on SME matters more as documents get longer (attention windows
+grow up to ±128 tokens); same machine, interleaved A/B against NEON
+attention:
+
+| Eval set (mean tokens/doc) | attn+router, NEON → SME | tok/s, NEON → SME |
+|---|---:|---:|
+| 6k loghub lines (50) | 1.87 → 1.70 s | 33,339 → 34,013 (1.02×) |
+| 1k English (112) | 1.06 → 0.72 s | 29,795 → 32,772 (1.10×) |
+| 1.5k Japanese (180) | 3.54 → 1.92 s | 26,734 → 32,453 (1.21×) |
 
 SME2 rounds differently from the reference (bias added after accumulation,
 different summation order), so it is near-exact rather than byte-identical.
@@ -166,9 +179,9 @@ Against `--exact` on held-out sets:
 
 | Eval set | lines changed | span F1 vs exact | char F1 vs gold, exact → SME2 |
 |---|---:|---:|---|
-| 6k loghub lines | 1.8% | 0.985 | (no gold) |
-| 1k English, PII-Masking-300k | 0.6% | 0.999 | 0.926 → 0.926 |
-| 1.5k Japanese, openpii-1.5m ja + Sumi | 4.5% | 0.993 | 0.796 → 0.797 |
+| 6k loghub lines | 1.6% | 0.988 | (no gold) |
+| 1k English, PII-Masking-300k | 0.4% | 0.999 | 0.926 → 0.926 |
+| 1.5k Japanese, openpii-1.5m ja + Sumi | 4.7% | 0.993 | 0.796 → 0.796 |
 
 That is a fraction of `--trim`'s drift, with gold accuracy unchanged. Use
 `--exact` when you need the reference's output byte for byte. `--calib`
@@ -209,7 +222,7 @@ Measured against the untrimmed model on an M4 Max (16 cores), held-out data:
 | 1.5k Japanese, openpii-1.5m ja + Sumi | 28.1% | 0.944 | 0.796 → 0.797 |
 
 Throughput on the log set is 5,182 → 6,491 tok/s on the `--exact` path
-(1.25×; experts phase 1.34×) and 33,382 → 39,736 tok/s with SME2 (1.19×).
+(1.25×; experts phase 1.34×) and 34,152 → 40,827 tok/s with SME2 (1.20×).
 Changes are near-tie span flips, not lost coverage: accuracy against
 gold labels is unchanged, and on logs the trimmed model emits about as many
 spans as the full one (5,300 vs 5,249). Narrower masks trade more agreement
