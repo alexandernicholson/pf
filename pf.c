@@ -472,11 +472,22 @@ static void cvt_bf16(const bf16 *w, float *y, int n) {
 /* --------------------------------------------------------------- parallel */
 static int pf_serial = -1;
 
+/* threads that run model code get 8 MiB stacks: the kernels keep ~150 KB of
+ * per-block buffers on the stack, and musl's default thread stack is 128 KB */
+static void spawn(void *(*fn)(void *), void *arg, int detached) {
+    pthread_t th;
+    pthread_attr_t at;
+    pthread_attr_init(&at);
+    pthread_attr_setstacksize(&at, (size_t)8 << 20);
+    if (detached) pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+    if (pthread_create(&th, &at, fn, arg)) die("pthread_create failed");
+    pthread_attr_destroy(&at);
+}
+
 #if !defined(__APPLE__) || defined(PF_POOL)
 /* portable pthread worker pool (Linux/Graviton; libdispatch is Apple-only) */
 #include <stdatomic.h>
 static struct {
-    pthread_t th[64];
     pthread_mutex_t mu;
     pthread_cond_t go, done;
     void (*fn)(void *, size_t); void *ctx;
@@ -507,7 +518,7 @@ static void pool_pfor(size_t n, void (*fn)(void *, size_t), void *ctx) {
         long nc = sysconf(_SC_NPROCESSORS_ONLN);
         PP.nthreads = nc < 1 ? 1 : (nc > 64 ? 64 : (int)nc);
         for (int i = 0; i < PP.nthreads; i++)
-            pthread_create(&PP.th[i], NULL, pp_worker, NULL);
+            spawn(pp_worker, NULL, 1);
         PP.started = 1;
     }
     pthread_mutex_lock(&PP.mu);
@@ -2190,8 +2201,7 @@ static void *conn_main(void *arg) {
 static void http_serve(int port, int n_ctx, int use_argmax) {
     signal(SIGPIPE, SIG_IGN);
     g_nctx_srv = n_ctx; g_argmax_srv = use_argmax;
-    pthread_t bt;
-    pthread_create(&bt, NULL, batcher_main, NULL);
+    spawn(batcher_main, NULL, 1);
     int s = socket(AF_INET, SOCK_STREAM, 0);
     int one = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
@@ -2202,12 +2212,7 @@ static void http_serve(int port, int n_ctx, int use_argmax) {
     for (;;) {
         int c = accept(s, NULL, NULL);
         if (c < 0) continue;
-        pthread_t th;
-        pthread_attr_t at;
-        pthread_attr_init(&at);
-        pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
-        pthread_create(&th, &at, conn_main, (void *)(intptr_t)c);
-        pthread_attr_destroy(&at);
+        spawn(conn_main, (void *)(intptr_t)c, 1);
     }
 }
 
