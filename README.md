@@ -279,7 +279,8 @@ Measured against the untrimmed model on an M4 Max (16 cores), held-out data:
 | 1.5k Japanese, openpii-1.5m ja + Sumi | 28.1% | 0.944 | 0.796 → 0.797 |
 
 Throughput on the log set is 5,182 → 6,491 tok/s on the `--exact` path
-(1.25×; experts phase 1.34×) and 36,138 → 43,676 tok/s with SME2 (1.21×).
+(1.25×; experts phase 1.34×), 36,138 → 43,676 tok/s with SME2 `--no-int8`
+(1.21×) and 46,851 → 55,243 tok/s with the SME2 default (1.18×).
 Changes are near-tie span flips, not lost coverage: accuracy against
 gold labels is unchanged, and on logs the trimmed model emits about as many
 spans as the full one (5,300 vs 5,249). Narrower masks trade more agreement
