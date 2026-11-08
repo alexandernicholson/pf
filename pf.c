@@ -9,6 +9,7 @@
  * Weights: ./model/{config.json,model.safetensors,o200k_base.tiktoken}
  *          (original-format checkpoint from HF openai/privacy-filter, original/)
  */
+#define _DEFAULT_SOURCE   /* glibc/musl: expose usleep, strncasecmp under -std=c11 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
