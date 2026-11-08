@@ -100,7 +100,7 @@
 static float g_skip_beta = 0.0f;   /* --skip-beta: dynamic expert skipping */
 static int   g_ff = FF;            /* expert intermediate width; < FF after --trim */
 static double (*g_calib)[NE][FF];  /* --calib: per-neuron sum of gate * |swiglu out| */
-static int    g_q8;                /* --int8: int8 expert weights and activations */
+static int    g_q8;                /* int8 expert weights and activations (layers >= Q8_FIRST) */
 static pthread_mutex_t g_calib_mu = PTHREAD_MUTEX_INITIALIZER;
 static const char *CAT[NCAT] = {"account_number","private_address","private_date",
     "private_email","private_person","private_phone","private_url","secret"};
@@ -885,6 +885,7 @@ static void sme_pack(void) {
 #else
 #define sme_pack() ((void)0)
 #define g_sme 0
+#define sme2_usable() 0
 #endif
 
 /* --int8 (layers >= Q8_FIRST): expert GEMMs in int8 with exact int32
@@ -2623,7 +2624,7 @@ static void http_serve(int port, int n_ctx, int use_argmax) {
 int main(int argc, char **argv) {
     const char *model_dir = getenv("PF_MODEL") ? getenv("PF_MODEL") : "model";
     int n_ctx = 4096, json = 0, use_argmax = 0, stats = 0, dump = 0;
-    int lines = 0, batch_tok = 16384, serve_port = 0, exact = 0;
+    int lines = 0, batch_tok = 16384, serve_port = 0, exact = 0, q8 = -1;
     const char *file = NULL, *trim = NULL, *calib = NULL;
     char *text = NULL; size_t text_len = 0;
     for (int a = 1; a < argc; a++) {
@@ -2641,7 +2642,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[a], "--trim") && a + 1 < argc) trim = argv[++a];
         else if (!strcmp(argv[a], "--calib") && a + 1 < argc) calib = argv[++a];
         else if (!strcmp(argv[a], "--exact")) exact = 1;
-        else if (!strcmp(argv[a], "--int8")) g_q8 = 1;
+        else if (!strcmp(argv[a], "--int8")) q8 = 1;
+        else if (!strcmp(argv[a], "--no-int8")) q8 = 0;
         else if (!strcmp(argv[a], "--batch") && a + 1 < argc) batch_tok = atoi(argv[++a]);
         else if (!strcmp(argv[a], "-f") && a + 1 < argc) file = argv[++a];
         else {
@@ -2653,7 +2655,11 @@ int main(int argc, char **argv) {
         }
     }
     if (trim && calib) die("--calib needs the full model (drop --trim)");
-    if (g_q8 && calib) die("--calib needs the bf16 experts (drop --int8)");
+    /* int8 experts by default where the default is already near-exact (SME2);
+     * --exact, --calib and non-SME2 chips keep bf16 unless --int8 forces it */
+    if (q8 < 0) q8 = !exact && !calib && sme2_usable();
+    if (q8 && calib) die("--calib needs the bf16 experts (drop --int8)");
+    g_q8 = q8;
     if (serve_port) {
         if (calib) die("--calib is not supported with --serve");
         tk_load(model_dir);
