@@ -28,6 +28,10 @@
 
 #if defined(__aarch64__)
 #include <arm_neon.h>
+#if defined(__ARM_FEATURE_SME2) && defined(__ARM_FEATURE_BF16) && !defined(PF_NO_BFDOT) && !defined(PF_NO_SME)
+#include <arm_sme.h>
+#define HAVE_SME 1
+#endif
 #endif
 #if defined(__APPLE__)
 #include <dispatch/dispatch.h>
@@ -343,6 +347,81 @@ static void moe_gemm(const bf16 *w, const bf16 *const *xs, float *const *ys,
         }
     }
 }
+
+#if defined(HAVE_SME)
+/* SME2 expert GEMM: y[MP][N] = x * W, fp32 rows of stride N.
+ * x packed [K/2][MP][2], W packed [K/2][N][2] (k-pair interleaved bf16) so one
+ * BFMOPA consumes 16 tokens x 16 outputs x 2 k. One token tile x four column
+ * tiles per pass; MP % 16 == 0, K even, N % 16 == 0. Runs in streaming mode,
+ * where NEON is unavailable, so callers do bias/activation outside. */
+__arm_locally_streaming __arm_new("za")
+static void sme_gemm(const bf16 *xp, int MP, const bf16 *wp, float *y, int K, int N) {
+    const svbool_t pt = svptrue_b16(), p32 = svptrue_b32();
+    const svcount_t pc = svptrue_c16();
+    for (int t0 = 0; t0 < MP; t0 += 16) {
+        int n0 = 0;
+        for (; n0 + 64 <= N; n0 += 64) {
+            svzero_za();
+            const bf16 *a = xp + t0 * 2, *b = wp + n0 * 2;
+            for (int p = 0; p < K / 2; p++, a += MP * 2, b += N * 2) {
+                svbfloat16_t va = svld1_bf16(pt, (const bfloat16_t *)a);
+                svbfloat16x4_t vb = svld1_bf16_x4(pc, (const bfloat16_t *)b);
+                svmopa_za32_bf16_m(0, pt, pt, va, svget4(vb, 0));
+                svmopa_za32_bf16_m(1, pt, pt, va, svget4(vb, 1));
+                svmopa_za32_bf16_m(2, pt, pt, va, svget4(vb, 2));
+                svmopa_za32_bf16_m(3, pt, pt, va, svget4(vb, 3));
+            }
+            for (int r = 0; r < 16; r++) {
+                float *o = y + (size_t)(t0 + r) * N + n0;
+                svst1_f32(p32, o,      svread_hor_za32_f32_m(svundef_f32(), p32, 0, r));
+                svst1_f32(p32, o + 16, svread_hor_za32_f32_m(svundef_f32(), p32, 1, r));
+                svst1_f32(p32, o + 32, svread_hor_za32_f32_m(svundef_f32(), p32, 2, r));
+                svst1_f32(p32, o + 48, svread_hor_za32_f32_m(svundef_f32(), p32, 3, r));
+            }
+        }
+        for (; n0 < N; n0 += 16) {      /* leftover column tiles (narrow --trim widths) */
+            svzero_za();
+            const bf16 *a = xp + t0 * 2, *b = wp + n0 * 2;
+            for (int p = 0; p < K / 2; p++, a += MP * 2, b += N * 2)
+                svmopa_za32_bf16_m(0, pt, pt, svld1_bf16(pt, (const bfloat16_t *)a),
+                                   svld1_bf16(pt, (const bfloat16_t *)b));
+            for (int r = 0; r < 16; r++)
+                svst1_f32(p32, y + (size_t)(t0 + r) * N + n0,
+                          svread_hor_za32_f32_m(svundef_f32(), p32, 0, r));
+        }
+    }
+}
+
+/* [K][N] -> [K/2][N][2]: rows 2p and 2p+1 interleaved per column */
+static void pack_kpairs(const bf16 *s, bf16 *d, int K, int N) {
+    for (int p = 0; p < K / 2; p++)
+        for (int j = 0; j < N; j++) {
+            d[((size_t)p * N + j) * 2]     = s[(size_t)(2 * p) * N + j];
+            d[((size_t)p * N + j) * 2 + 1] = s[(size_t)(2 * p + 1) * N + j];
+        }
+}
+
+/* [N][K] (output-major, as stored) -> [K/2][N][2]; memcpy: tensors may be 2-byte aligned */
+static void pack_omajor(const bf16 *w, int N, int K, bf16 *d) {
+    uint32_t *d32 = (uint32_t *)d;
+    for (int o = 0; o < N; o++)
+        for (int p = 0; p < K / 2; p++)
+            memcpy(&d32[(size_t)p * N + o], w + (size_t)o * K + 2 * p, 4);
+}
+
+/* m bf16 rows of n -> [n/2][MP][2], rows m..MP zero-padded */
+static void pack_rows(const bf16 *const *rows, int m, int MP, int n, bf16 *d) {
+    uint32_t *d32 = (uint32_t *)d;
+    for (int i = 0; i < MP; i++) {
+        if (i < m) {
+            const uint32_t *r = (const uint32_t *)rows[i];
+            for (int p = 0; p < n / 2; p++) d32[(size_t)p * MP + i] = r[p];
+        } else {
+            for (int p = 0; p < n / 2; p++) d32[(size_t)p * MP + i] = 0;
+        }
+    }
+}
+#endif
 #endif
 
 #if defined(CVT_BF16_AVX2)
@@ -481,6 +560,7 @@ typedef struct {
     bf16 *mlp_norm, *gate_w, *gate_b;
     bf16 *w1, *b1;                     /* [NE][D][2W], [NE][2W]  (W = g_ff) */
     bf16 *w2, *b2;                     /* [NE][W][D],  [NE][D]  */
+    bf16 *qkv_p, *out_p;               /* SME packings of qkv_w, attn_out_w */
 } Layer;
 
 static struct {
@@ -561,6 +641,51 @@ static void trim_load(const char *path) {
     g_ff = (int)w;
 }
 
+#if defined(HAVE_SME)
+/* SME (default on SME2 builds; --exact keeps the reference-identical BFDOT path):
+ * re-pack expert weights k-pair interleaved (sme_gemm layout) once at load,
+ * after --trim; the mmap'd originals are unpinned so RSS doesn't double. */
+static int g_sme;
+static bf16 *g_pk[NL][2];
+static void pack_expert(void *ctx, size_t i) {
+    (void)ctx;
+    const int l = (int)(i / NE), W = g_ff;
+    const size_t e = i % NE;
+    const Layer *y = &M.L[l];
+    pack_kpairs(y->w1 + e * D * 2 * W, g_pk[l][0] + e * D * 2 * W, D, 2 * W);
+    pack_kpairs(y->w2 + e * W * D,     g_pk[l][1] + e * W * D,     W, D);
+}
+static void unpin(const void *p, size_t n) {
+    uintptr_t pg = (uintptr_t)getpagesize();
+    uintptr_t a = ((uintptr_t)p + pg - 1) & ~(pg - 1), b = ((uintptr_t)p + n) & ~(pg - 1);
+    if (b > a) { munlock((void *)a, b - a); madvise((void *)a, b - a, MADV_DONTNEED); }
+}
+static void sme_pack(void) {
+    const size_t W = (size_t)g_ff;
+    for (int l = 0; l < NL; l++)
+        if (!(g_pk[l][0] = malloc(NE * D * 2 * W * 2)) || !(g_pk[l][1] = malloc(NE * W * D * 2)))
+            die("out of memory");
+    pfor((size_t)NL * NE, pack_expert, NULL);
+    for (int l = 0; l < NL; l++) {     /* dense projections, stored [out][in] */
+        Layer *y = &M.L[l];
+        if (!(y->qkv_p = malloc((size_t)QKVD * D * 2)) || !(y->out_p = malloc((size_t)D * QD * 2)))
+            die("out of memory");
+        pack_omajor(y->qkv_w, QKVD, D, y->qkv_p);
+        pack_omajor(y->attn_out_w, D, QD, y->out_p);
+    }
+    for (int l = 0; l < NL; l++) {
+        Layer *y = &M.L[l];
+        if (W != FF) { free(y->w1); free(y->w2); }   /* trim_load's copies */
+        else { unpin(y->w1, NE * D * 2 * W * 2); unpin(y->w2, NE * W * D * 2); }
+        y->w1 = g_pk[l][0]; y->w2 = g_pk[l][1];
+    }
+    g_sme = 1;
+}
+#else
+#define sme_pack() ((void)0)
+#define g_sme 0
+#endif
+
 /* --calib: per-neuron importance E[gate * |h_j|] * ||W2 row j||, normalized per
  * token so stats from several corpora can be summed with equal weight (trim.py).
  * A tiny ||W2|| term breaks ties for neurons the corpus never reached. */
@@ -570,9 +695,13 @@ static void calib_write(const char *path, size_t ntok) {
     for (int l = 0; l < NL; l++)
         for (int e = 0; e < NE; e++)
             for (int j = 0; j < FF; j++) {
-                const bf16 *r = M.L[l].w2 + ((size_t)e * FF + j) * D;
+                const bf16 *w2 = M.L[l].w2 + (size_t)e * FF * D;
                 double n2 = 0;
-                for (int i = 0; i < D; i++) { float v = b2f(r[i]); n2 += (double)v * v; }
+                for (int i = 0; i < D; i++) {   /* row j of [FF][D], or of its SME [FF/2][D][2] packing */
+                    size_t k = g_sme ? ((size_t)(j / 2) * D + i) * 2 + (j & 1) : (size_t)j * D + i;
+                    float v = b2f(w2[k]);
+                    n2 += (double)v * v;
+                }
                 float s = (float)((g_calib[l][e][j] / (double)(ntok ? ntok : 1) + 1e-12) * sqrt(n2));
                 fwrite(&s, sizeof s, 1, f);
             }
@@ -978,9 +1107,8 @@ static void rope_apply(float *vec, int nheads, const float *rc, const float *rs)
     }
 }
 
-/* phase A: moe-reduce (layer>0) + attn norm + qkv + rope, per token */
-static void ph_a(void *ctx, size_t t) {
-    (void)ctx;
+/* phase A: moe-reduce (layer>0) + attn norm + qkv + rope */
+static void a_pre(size_t t) {      /* residual + norm -> R.tb / R.tbh */
     Layer *y = &M.L[R.layer];
     float *x = R.x + t * D;
     if (R.layer > 0) {
@@ -989,9 +1117,25 @@ static void ph_a(void *ctx, size_t t) {
             for (int i = 0; i < D; i++) x[i] += m[s * D + i];
     }
     float *tb = R.tb + t * D;
-    bf16 *th = R.tbh + t * D;
     rms_norm(x, y->attn_norm, tb);
-    CVT_H(tb, th, D);
+    CVT_H(tb, R.tbh + t * D, D);
+}
+static void a_post(size_t t) {     /* rope + score scale on projected q, k */
+    float *q = R.q + t * QD, *k = R.k + t * KVD;
+    const float *rc = R.rc + (size_t)R.pos[t] * (HD / 2);
+    const float *rs = R.rs + (size_t)R.pos[t] * (HD / 2);
+    rope_apply(q, NH, rc, rs);
+    rope_apply(k, NKV, rc, rs);
+    for (int i = 0; i < QD; i++)  q[i] *= QK_SCALE;
+    for (int i = 0; i < KVD; i++) k[i] *= QK_SCALE;
+}
+static void ph_a(void *ctx, size_t t) {
+    (void)ctx;
+    Layer *y = &M.L[R.layer];
+    a_pre(t);
+    const float *tb = R.tb + t * D;
+    const bf16 *th = R.tbh + t * D;
+    (void)tb; (void)th;            /* DOT_X reads one of them, depending on the build */
     float *q = R.q + t * QD, *k = R.k + t * KVD, *v = R.v + t * KVD;
     for (int o = 0; o < QD; o++)
         q[o] = DOT_X(tb, th, y->qkv_w + (size_t)o * D, D) + b2f(y->qkv_b[o]);
@@ -1000,18 +1144,35 @@ static void ph_a(void *ctx, size_t t) {
     for (int o = 0; o < KVD; o++)
         v[o] = DOT_X(tb, th, y->qkv_w + (size_t)(QD + KVD + o) * D, D)
                + b2f(y->qkv_b[QD + KVD + o]);
-    const float *rc = R.rc + (size_t)R.pos[t] * (HD / 2);
-    const float *rs = R.rs + (size_t)R.pos[t] * (HD / 2);
-    rope_apply(q, NH, rc, rs);
-    rope_apply(k, NKV, rc, rs);
-    for (int i = 0; i < QD; i++)  q[i] *= QK_SCALE;
-    for (int i = 0; i < KVD; i++) k[i] *= QK_SCALE;
+    a_post(t);
 }
-
-/* phase B: banded attention + out proj + residual + mlp norm + router, per token */
-static void ph_b(void *ctx, size_t t) {
+#if defined(HAVE_SME)
+#define DB 16                      /* tokens per SME dense-projection block */
+static void ph_a_sme(void *ctx, size_t b) {
     (void)ctx;
     Layer *y = &M.L[R.layer];
+    const size_t t0 = b * DB;
+    const int m = R.T - (int)t0 < DB ? R.T - (int)t0 : DB;
+    bf16 xp[DB * D];
+    float out[DB * QKVD];
+    const bf16 *rows[DB] = {0};
+    for (int i = 0; i < m; i++) { a_pre(t0 + i); rows[i] = R.tbh + (t0 + i) * D; }
+    pack_rows(rows, m, DB, D, xp);
+    sme_gemm(xp, DB, y->qkv_p, out, D, QKVD);
+    for (int i = 0; i < m; i++) {
+        const size_t t = t0 + i;
+        const float *r = out + (size_t)i * QKVD;
+        float *q = R.q + t * QD, *k = R.k + t * KVD, *v = R.v + t * KVD;
+        for (int o = 0; o < QD; o++)  q[o] = r[o] + b2f(y->qkv_b[o]);
+        for (int o = 0; o < KVD; o++) k[o] = r[QD + o] + b2f(y->qkv_b[QD + o]);
+        for (int o = 0; o < KVD; o++) v[o] = r[QD + KVD + o] + b2f(y->qkv_b[QD + KVD + o]);
+        a_post(t);
+    }
+}
+#endif
+
+/* phase B: banded attention + out proj + residual + mlp norm + router */
+static void b_attn(size_t t) {     /* banded attention -> R.ao */
     int j0 = (int)t - BAND; if (j0 < R.sst[t]) j0 = R.sst[t];
     int j1 = (int)t + BAND; if (j1 >= R.sen[t]) j1 = R.sen[t] - 1;
     float *ao = R.ao + t * QD;
@@ -1063,12 +1224,10 @@ static void ph_b(void *ctx, size_t t) {
         }
 #endif
     }
+}
+static void b_post(size_t t) {     /* mlp norm + router + top-k gates */
+    Layer *y = &M.L[R.layer];
     float *x = R.x + t * D;
-    bf16 aoh[QD];
-    CVT_H(ao, aoh, QD);
-    for (int o = 0; o < D; o++)
-        x[o] += DOT_X(ao, aoh, y->attn_out_w + (size_t)o * QD, QD) + b2f(y->attn_out_b[o]);
-    /* mlp norm + router */
     float *tb = R.tb + t * D;
     bf16 *th = R.tbh + t * D;
     rms_norm(x, y->mlp_norm, tb);
@@ -1103,6 +1262,42 @@ static void ph_b(void *ctx, size_t t) {
         for (int s = 0; s < keep; s++) gw[s] /= kden;
     }
 }
+static void ph_b(void *ctx, size_t t) {
+    (void)ctx;
+    Layer *y = &M.L[R.layer];
+    b_attn(t);
+    const float *ao = R.ao + t * QD;
+    float *x = R.x + t * D;
+    bf16 aoh[QD];
+    CVT_H(ao, aoh, QD);
+    for (int o = 0; o < D; o++)
+        x[o] += DOT_X(ao, aoh, y->attn_out_w + (size_t)o * QD, QD) + b2f(y->attn_out_b[o]);
+    b_post(t);
+}
+#if defined(HAVE_SME)
+static void ph_b_sme(void *ctx, size_t b) {
+    (void)ctx;
+    Layer *y = &M.L[R.layer];
+    const size_t t0 = b * DB;
+    const int m = R.T - (int)t0 < DB ? R.T - (int)t0 : DB;
+    bf16 xp[DB * QD], hb[DB][QD];
+    float out[DB * D];
+    const bf16 *rows[DB] = {0};
+    for (int i = 0; i < m; i++) {
+        b_attn(t0 + i);
+        cvt_f32_bf16(R.ao + (t0 + i) * QD, hb[i], QD);
+        rows[i] = hb[i];
+    }
+    pack_rows(rows, m, DB, QD, xp);
+    sme_gemm(xp, DB, y->out_p, out, QD, D);
+    for (int i = 0; i < m; i++) {
+        float *x = R.x + (t0 + i) * D;
+        const float *r = out + (size_t)i * D;
+        for (int o = 0; o < D; o++) x[o] += r[o] + b2f(y->attn_out_b[o]);
+        b_post(t0 + i);
+    }
+}
+#endif
 
 /* swiglu halves -> h (chunked layout, gpt-oss clamps and +1 linear bias) */
 static void swiglu_act(const float *h1, float *h, int n) {
@@ -1135,6 +1330,43 @@ static void calib_add(int e, const double *imp) {
 }
 
 /* phase C: experts (parallel over experts, chained token lists) */
+#if defined(HAVE_SME)
+#define MOE_BP ((MOE_B + 15) & ~15)
+static void moe_block_sme(const bf16 *w1, const bf16 *b1, const bf16 *w2, const bf16 *b2,
+                      const int *blk, int m, int e) {
+    const int W = g_ff, MP = (m + 15) & ~15;
+    float y1[MOE_BP * 2 * FF], y2[MOE_BP * D], bias[2 * FF], h[FF];
+    bf16 xp[MOE_BP * FF], hb[MOE_BP][FF];    /* D == FF: xp fits either GEMM's input */
+    double imp[FF];
+    const bf16 *rows[MOE_BP] = {0};    /* only [0, m) read; init quiets gcc */
+    if (g_calib) memset(imp, 0, sizeof imp);
+    for (int i = 0; i < m; i++) rows[i] = R.tbh + (size_t)(blk[i] / TOPK) * D;
+    pack_rows(rows, m, MP, D, xp);
+    sme_gemm(xp, MP, w1, y1, D, 2 * W);
+    cvt_bf16(b1, bias, 2 * W);
+    for (int i = 0; i < m; i++) {
+        float *r = y1 + (size_t)i * 2 * W;
+        for (int j = 0; j < 2 * W; j++) r[j] += bias[j];
+        swiglu_act(r, h, W);
+        if (g_calib) {
+            float gw = R.gates[blk[i]];
+            for (int j = 0; j < W; j++) imp[j] += gw * fabsf(h[j]);
+        }
+        cvt_f32_bf16(h, hb[i], W);
+        rows[i] = hb[i];
+    }
+    pack_rows(rows, m, MP, W, xp);
+    sme_gemm(xp, MP, w2, y2, W, D);
+    cvt_bf16(b2, bias, D);
+    for (int i = 0; i < m; i++) {
+        float gw = R.gates[blk[i]];
+        float *o = R.moe + (size_t)blk[i] * D;
+        const float *r = y2 + (size_t)i * D;
+        for (int j = 0; j < D; j++) o[j] = (r[j] + bias[j]) * gw;
+    }
+    if (g_calib) calib_add(e, imp);
+}
+#endif
 #if defined(HAVE_BFDOT)
 static void moe_block(const bf16 *w1, const bf16 *b1, const bf16 *w2, const bf16 *b2,
                       const int *blk, int m, int e) {
@@ -1142,7 +1374,7 @@ static void moe_block(const bf16 *w1, const bf16 *b1, const bf16 *w2, const bf16
     float h1s[MOE_B][2 * FF], outs[MOE_B][D], h[FF];
     bf16 hhs[MOE_B][FF];
     double imp[FF];
-    const bf16 *xh[MOE_B]; float *yp[MOE_B];
+    const bf16 *xh[MOE_B] = {0}; float *yp[MOE_B] = {0};   /* only [0, m) read; init quiets gcc */
     if (g_calib) memset(imp, 0, sizeof imp);
     for (int i = 0; i < m; i++) {
         xh[i] = R.tbh + (size_t)(blk[i] / TOPK) * D;
@@ -1168,14 +1400,22 @@ static void moe_block(const bf16 *w1, const bf16 *b1, const bf16 *w2, const bf16
     }
     if (g_calib) calib_add(e, imp);
 }
+#endif
 
+#if defined(HAVE_BFDOT)
 static void ph_c(void *ctx, size_t c) {
     (void)ctx;
     Layer *y = &M.L[R.layer];
     size_t e = (size_t)R.wchunk[c].e, W = (size_t)g_ff;
-    moe_block(y->w1 + e * D * 2 * W, y->b1 + e * 2 * W,
-              y->w2 + e * W * D,     y->b2 + e * D,
-              R.wlist + R.wchunk[c].off, R.wchunk[c].cnt, (int)e);
+#if defined(HAVE_SME)
+    void (*blk)(const bf16 *, const bf16 *, const bf16 *, const bf16 *, const int *, int, int) =
+        g_sme ? moe_block_sme : moe_block;
+#else
+    void (*blk)(const bf16 *, const bf16 *, const bf16 *, const bf16 *, const int *, int, int) = moe_block;
+#endif
+    blk(y->w1 + e * D * 2 * W, y->b1 + e * 2 * W,
+        y->w2 + e * W * D,     y->b2 + e * D,
+        R.wlist + R.wchunk[c].off, R.wchunk[c].cnt, (int)e);
 }
 #else
 static void ph_c(void *ctx, size_t c) {
@@ -1248,8 +1488,16 @@ static void forward(const int32_t *ids, int T) {
     for (int l = 0; l < NL; l++) {
         R.layer = l;
         double u0 = now_ms();
+#if defined(HAVE_SME)
+        if (g_sme) pfor(((size_t)T + DB - 1) / DB, ph_a_sme, NULL);
+        else
+#endif
         pfor(T, ph_a, NULL);
         double u1 = now_ms();
+#if defined(HAVE_SME)
+        if (g_sme) pfor(((size_t)T + DB - 1) / DB, ph_b_sme, NULL);
+        else
+#endif
         pfor(T, ph_b, NULL);
         double u2 = now_ms();
         /* bucket (token,slot) pairs by expert, then split into <=MOE_B chunks
@@ -1929,7 +2177,7 @@ static void http_serve(int port, int n_ctx, int use_argmax) {
 int main(int argc, char **argv) {
     const char *model_dir = getenv("PF_MODEL") ? getenv("PF_MODEL") : "model";
     int n_ctx = 4096, json = 0, use_argmax = 0, stats = 0, dump = 0;
-    int lines = 0, batch_tok = 16384, serve_port = 0;
+    int lines = 0, batch_tok = 16384, serve_port = 0, exact = 0;
     const char *file = NULL, *trim = NULL, *calib = NULL;
     char *text = NULL; size_t text_len = 0;
     for (int a = 1; a < argc; a++) {
@@ -1946,6 +2194,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[a], "--skip-beta") && a + 1 < argc) g_skip_beta = (float)atof(argv[++a]);
         else if (!strcmp(argv[a], "--trim") && a + 1 < argc) trim = argv[++a];
         else if (!strcmp(argv[a], "--calib") && a + 1 < argc) calib = argv[++a];
+        else if (!strcmp(argv[a], "--exact")) exact = 1;
         else if (!strcmp(argv[a], "--batch") && a + 1 < argc) batch_tok = atoi(argv[++a]);
         else if (!strcmp(argv[a], "-f") && a + 1 < argc) file = argv[++a];
         else {
@@ -1962,6 +2211,7 @@ int main(int argc, char **argv) {
         tk_load(model_dir);
         model_load(model_dir);
         if (trim) trim_load(trim);
+        if (!exact) sme_pack();
         viterbi_init();
         engine_init(n_ctx, batch_tok);
         http_serve(serve_port, n_ctx, use_argmax);
@@ -2022,6 +2272,7 @@ int main(int argc, char **argv) {
     }
     model_load(model_dir);
     if (trim) trim_load(trim);
+    if (!exact) sme_pack();
     if (calib && !(g_calib = calloc(NL, sizeof *g_calib))) die("out of memory");
     viterbi_init();
     double t1 = now_ms();

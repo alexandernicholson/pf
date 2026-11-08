@@ -12,7 +12,10 @@ Call <PRIVATE_PERSON> at <PRIVATE_PHONE> or <PRIVATE_EMAIL>
 
 Output is byte-identical to the Python reference (`opf --device cpu`) on every
 input tested — including windowed long inputs — at ~1,650 tok/s warm on an M2
-Air (~65× the reference, ~166 GFLOPS sustained).
+Air (~65× the reference, ~166 GFLOPS sustained). On SME2 chips (Apple M4 and
+later) the default path runs the matmuls on the SME matrix engine instead —
+~6× faster, near-exact (see [SME2](#sme2-matrix-engine-m4-and-later)); `--exact`
+keeps the byte-identical path there.
 
 ## What's inside (pf.c, ~1,300 lines)
 
@@ -26,6 +29,8 @@ Air (~65× the reference, ~166 GFLOPS sustained).
   product) GEMM with pair-interleaved k-tiles reused across 16-token blocks;
   expert work split into `(expert, ≤16 tokens)` chunks dispatched via
   libdispatch to dodge router skew; NEON exp/sigmoid; parallel page pre-touch.
+  On SME2, expert and QKV/output-projection GEMMs run as `BFMOPA` outer
+  products on weights re-packed at load.
 - **Decoding**: fp32 log-softmax → constrained BIOES Viterbi (33 states, the
   shipped calibration biases are all zero) → span merge, UTF-8 snap,
   whitespace trim, per-label overlap discard → `<LABEL>` masking.
@@ -81,7 +86,8 @@ python3 -c "import tiktoken,base64; e=tiktoken.get_encoding('o200k_base'); \
 ./pf --argmax              # per-token argmax instead of Viterbi
 ./pf --ctx N               # context window (default 4096, matching reference CPU)
 ./pf --stats               # timing breakdown on stderr
-./pf --trim trim/w480.mask # approximate: narrower experts, ~1.25x faster (see below)
+./pf --exact               # SME2 chips: keep the reference-identical BFDOT path
+./pf --trim trim/w480.mask # approximate: narrower experts, ~1.2x faster (see below)
 ./pf --calib out.bin       # write per-neuron expert importance stats (for trim.py)
 PF_MODEL=/path/to/model    # checkpoint dir (default ./model)
 ```
@@ -126,18 +132,53 @@ sequential handling (~29 → ~55 docs/s on an M2 Air) with identical outputs;
 solo-request latency pays only the linger. Adding a format = one row in the
 `ADAPTERS` table (route + path patterns).
 
+## SME2 matrix engine (M4 and later)
+
+On chips with SME2 the expert GEMMs and the QKV / attention-output
+projections run as `BFMOPA` outer products (16 tokens × 64 outputs per pass,
+fp32 accumulation in ZA tiles). Weights are re-packed k-pair-interleaved at
+load (+0.15 s; the mmap'd originals are unpinned, so RSS doesn't double);
+attention, norms, SwiGLU and the router stay on NEON/BFDOT.
+
+An M4 Max's SME units peak at ~4.1 TFLOPS bf16 in total (one per
+performance cluster); the expert GEMMs sustain ~3.8 inside `pf`. Measured on
+6k loghub lines (299k tokens), M4 Max, mean of two interleaved runs:
+
+| Mode | norm+qkv | attn+router | experts | tok/s | lines/min |
+|---|---:|---:|---:|---:|---:|
+| `--exact` (BFDOT) | 6.2 s | 6.4 s | 44.5 s | 5,225 | 6,300 |
+| default (SME2) | 0.9 s | 1.8 s | 6.1 s | 33,382 | 40,200 |
+| SME2 + `--trim trim/w480.mask` | 0.9 s | 1.8 s | 4.7 s | 39,736 | 47,900 |
+
+SME2 rounds differently from the reference (bias added after accumulation,
+different summation order), so it is near-exact rather than byte-identical.
+Against `--exact` on held-out sets:
+
+| Eval set | lines changed | span F1 vs exact | char F1 vs gold, exact → SME2 |
+|---|---:|---:|---|
+| 6k loghub lines | 1.8% | 0.985 | (no gold) |
+| 1k English, PII-Masking-300k | 0.6% | 0.999 | 0.926 → 0.926 |
+| 1.5k Japanese, openpii-1.5m ja + Sumi | 4.5% | 0.993 | 0.796 → 0.797 |
+
+That is a fraction of `--trim`'s drift, with gold accuracy unchanged. Use
+`--exact` when you need the reference's output byte for byte. `--calib`
+stats agree with `--exact`'s to within the BFDOT-vs-NEON noise floor.
+
 ## Portability
 
-One small kernel interface, three implementations, chosen at compile time:
+One small kernel interface, chosen at compile time:
 
+- **SME2** — Apple M4 and later (`-mcpu=native` enables it); also builds the
+  BFDOT path, selected at run time with `--exact`
 - **NEON + BFDOT** — Apple Silicon and AWS Graviton 3/4 (`-mcpu=native`)
 - **AVX2 + FMA** — Intel / AMD (`-mavx2 -mfma`), same shift-widen bf16 trick
 - **scalar C** — anything else
 
-All three produce byte-identical output (the AVX2 and scalar builds are
-verified under Rosetta 2). Threading uses libdispatch on macOS and a built-in
-pthread pool elsewhere; no other dependencies. Linux build:
-`cc -O3 -std=c11 -march=native -pthread -o pf pf.c -lm`
+BFDOT, AVX2 and scalar produce byte-identical output (the AVX2 and scalar
+builds are verified under Rosetta 2). Threading uses libdispatch on macOS and
+a built-in pthread pool elsewhere; no other dependencies. Linux build:
+`cc -O3 -std=c11 -march=native -pthread -o pf pf.c -lm`. `-DPF_NO_SME` builds
+without the SME2 path.
 
 ## Approximate modes
 
@@ -156,8 +197,9 @@ Measured against the untrimmed model on an M4 Max (16 cores), held-out data:
 | 1k English, PII-Masking-300k | 5.2% | 0.991 | 0.926 → 0.926 |
 | 1.5k Japanese, openpii-1.5m ja + Sumi | 28.1% | 0.944 | 0.796 → 0.797 |
 
-Throughput on the log set is 5,182 → 6,491 tok/s (1.25×; experts phase
-1.34×). Changes are near-tie span flips, not lost coverage: accuracy against
+Throughput on the log set is 5,182 → 6,491 tok/s on the `--exact` path
+(1.25×; experts phase 1.34×) and 33,382 → 39,736 tok/s with SME2 (1.19×).
+Changes are near-tie span flips, not lost coverage: accuracy against
 gold labels is unchanged, and on logs the trimmed model emits about as many
 spans as the full one (5,300 vs 5,249). Narrower masks trade more agreement
 for speed (width 320: 1.56×, 21% of log lines changed, ~8% fewer log spans;
